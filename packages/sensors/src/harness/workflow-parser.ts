@@ -1522,6 +1522,9 @@ const COMPUTED_IMPORT = /\b(?:import|require)\s*\(\s*(?!['"][^'"\n]*['"]\s*\))/u
 
 /** True when a source line outside a line comment holds a computed dynamic import. */
 function hasComputedImport(source: string): boolean {
+  // A createRequire loader alias can load package or computed local modules even when
+  // its calls do not spell require(). Require an explicit reviewed source cover.
+  if (/\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*createRequire\s*\(/u.test(source)) return true;
   return source
     .split('\n')
     .some((line) => !/^\s*(?:\/\/|\*)/u.test(line) && COMPUTED_IMPORT.test(line));

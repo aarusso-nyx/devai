@@ -17,7 +17,8 @@ import {
 } from '../services/adopter-policy-binding.js';
 import { repositoryIdFor } from '../authority/policy.js';
 import { adopterAuthorityExtensionDigest } from '../authority/policy-adopter-extension.js';
-import { classWriteVerbs } from '../authority/policy-support.js';
+import { classWriteVerbs, authorityBindings } from '../authority/policy-support.js';
+import { resolveDocumentationBinding } from '../authority/documentation-binding.js';
 import { canonicalRegistry } from '../define-command.js';
 import {
   type CheckResult,
@@ -313,6 +314,23 @@ function checkAdopterPolicyMaterialization(repoRoot: string, bindingPath: string
     return result(sourceLexical);
   }
 
+  if (
+    binding.documentation_implementation !== undefined ||
+    (isJsonObject(policy) && policy['documentation_implementation'] !== undefined)
+  ) {
+    try {
+      resolveDocumentationBinding({
+        root: repoRoot,
+        entries: canonicalRegistry(),
+        bindings: authorityBindings(repoRoot, resolveCliVersion()),
+      });
+    } catch (error) {
+      addReason(
+        'DOCUMENTATION_IMPLEMENTATION_BINDING_MISMATCH',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
   // Every finding is reported as a set: the extension comparison runs whether or not the
   // source bytes still match the receipt.
   const extension = compareAuthorityExtension(repoRoot, policy, boundExtension, sourceLexical);

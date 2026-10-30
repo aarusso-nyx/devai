@@ -323,7 +323,10 @@ function extensionTie(rules: readonly AnyRecord[]): string[] {
   return new Set(tied.map(humanRoleSet)).size > 1 ? tied.map((rule) => String(rule.rule_id)) : [];
 }
 
-function classification(rules: AnyRecord[], resource: AnyRecord): AnyRecord[] {
+function classifications(
+  rules: AnyRecord[],
+  resource: AnyRecord,
+): { readonly resource: AnyRecord; readonly rules: AnyRecord[] }[] {
   const sides =
     resource.kind === 'fs' && resource.operation === 'rename'
       ? [
@@ -335,11 +338,32 @@ function classification(rules: AnyRecord[], resource: AnyRecord): AnyRecord[] {
     rules.filter((rule) => policySelectorMatches(rule.selector, side, true)),
   );
   if (matchedBySide.some((items) => items.length === 0)) return [];
+  // Exact documentation grants must not lend their higher precedence to the other
+  // rename endpoint. Keep destination-first order and decide every policy dimension
+  // independently for each endpoint before creating a single allow resolution.
+  const documentationRename =
+    sides.length === 2 &&
+    matchedBySide.some((items) =>
+      items.some(
+        (rule) =>
+          rule.origin === 'immutable-core' &&
+          typeof rule.rule_id === 'string' &&
+          rule.rule_id.startsWith('core-documentation-implementation-'),
+      ),
+    );
+  if (documentationRename) {
+    return sides.map((side, index) => {
+      const items = matchedBySide[index] ?? [];
+      const highest = Math.max(...items.map((rule) => Number(rule.precedence)));
+      return { resource: side, rules: items.filter((rule) => Number(rule.precedence) === highest) };
+    });
+  }
+  // Preserve the existing ordinary/no-specialization classification exactly.
   const union = new Map<string, AnyRecord>();
   for (const items of matchedBySide) for (const item of items) union.set(item.rule_id, item);
   const candidates = [...union.values()];
   const highest = Math.max(...candidates.map((rule) => Number(rule.precedence)));
-  return candidates.filter((rule) => Number(rule.precedence) === highest);
+  return [{ resource, rules: candidates.filter((rule) => Number(rule.precedence) === highest) }];
 }
 
 export function resolveAuthorityPolicy(policy: unknown, queryValue: unknown, deps: unknown) {
@@ -417,73 +441,82 @@ export function resolveAuthorityPolicy(policy: unknown, queryValue: unknown, dep
     return deny(state, policy, query, 'AUTHORITY_POLICY_BINDING_MISMATCH');
   const rules = policy.document.view.rules;
   if (!Array.isArray(rules)) return deny(state, policy, query, 'AUTHORITY_POLICY_BINDING_MISMATCH');
-  const classified = classification(rules, query.resource);
-  if (classified.length === 0) return deny(state, policy, query, 'UNCLASSIFIED_RESOURCE');
-  const actionRules = classified.filter((rule) => rule.action_ids?.includes(query.action_id));
-  if (actionRules.length === 0)
-    return deny(
-      state,
-      policy,
-      query,
-      'AUTHORITY_ACTION_DENIED',
-      classified.map((rule) => rule.rule_id),
+  const groups = classifications(rules, query.resource);
+  if (groups.length === 0) return deny(state, policy, query, 'UNCLASSIFIED_RESOURCE');
+  const allowedRules: AnyRecord[] = [];
+  for (const group of groups) {
+    const classified = group.rules;
+    if (classified.length === 0) return deny(state, policy, query, 'UNCLASSIFIED_RESOURCE');
+    const actionRules = classified.filter((rule) => rule.action_ids?.includes(query.action_id));
+    if (actionRules.length === 0)
+      return deny(
+        state,
+        policy,
+        query,
+        'AUTHORITY_ACTION_DENIED',
+        classified.map((rule) => rule.rule_id),
+      );
+    const tie = extensionTie(actionRules);
+    if (tie.length > 0) return deny(state, policy, query, 'AMBIGUOUS_POLICY_MATCH', tie);
+    const subjectRules = actionRules.filter(
+      (rule) =>
+        Array.isArray(rule.subjects) &&
+        rule.subjects.some((subject: AnyRecord) => subjectMatches(subject, record.subject)),
     );
-  const tie = extensionTie(actionRules);
-  if (tie.length > 0) return deny(state, policy, query, 'AMBIGUOUS_POLICY_MATCH', tie);
-  const subjectRules = actionRules.filter(
-    (rule) =>
-      Array.isArray(rule.subjects) &&
-      rule.subjects.some((subject: AnyRecord) => subjectMatches(subject, record.subject)),
-  );
-  if (subjectRules.length === 0)
-    return deny(
-      state,
-      policy,
-      query,
-      'AUTHORITY_SUBJECT_DENIED',
-      actionRules.map((rule) => rule.rule_id),
+    if (subjectRules.length === 0)
+      return deny(
+        state,
+        policy,
+        query,
+        'AUTHORITY_SUBJECT_DENIED',
+        actionRules.map((rule) => rule.rule_id),
+      );
+    const operationRules = subjectRules.filter((rule) =>
+      policySelectorMatches(rule.selector, group.resource),
     );
-  const operationRules = subjectRules.filter((rule) =>
-    policySelectorMatches(rule.selector, query.resource),
-  );
-  if (operationRules.length === 0)
-    return deny(
-      state,
-      policy,
-      query,
-      'AUTHORITY_OPERATION_DENIED',
-      subjectRules.map((rule) => rule.rule_id),
+    if (operationRules.length === 0)
+      return deny(
+        state,
+        policy,
+        query,
+        'AUTHORITY_OPERATION_DENIED',
+        subjectRules.map((rule) => rule.rule_id),
+      );
+    const consentRules = operationRules.filter((rule) =>
+      ['write', 'allow_publish', 'experimental'].every(
+        (key) => !rule.required_consent?.[key] || query.consent[key] === true,
+      ),
     );
-  const consentRules = operationRules.filter((rule) =>
-    ['write', 'allow_publish', 'experimental'].every(
-      (key) => !rule.required_consent?.[key] || query.consent[key] === true,
-    ),
-  );
-  if (consentRules.length === 0)
-    return deny(
-      state,
-      policy,
-      query,
-      'AUTHORITY_CONSENT_REQUIRED',
-      operationRules.map((rule) => rule.rule_id),
-    );
-  const effects = new Set(consentRules.map((rule) => rule.effect));
-  if (effects.size > 1)
-    return deny(
-      state,
-      policy,
-      query,
-      'AMBIGUOUS_POLICY_MATCH',
-      consentRules.map((rule) => rule.rule_id),
-    );
-  if (effects.has('deny'))
-    return deny(
-      state,
-      policy,
-      query,
-      'POLICY_DENY',
-      consentRules.map((rule) => rule.rule_id),
-    );
+    if (consentRules.length === 0)
+      return deny(
+        state,
+        policy,
+        query,
+        'AUTHORITY_CONSENT_REQUIRED',
+        operationRules.map((rule) => rule.rule_id),
+      );
+    const effects = new Set(consentRules.map((rule) => rule.effect));
+    if (effects.size > 1)
+      return deny(
+        state,
+        policy,
+        query,
+        'AMBIGUOUS_POLICY_MATCH',
+        consentRules.map((rule) => rule.rule_id),
+      );
+    if (effects.has('deny'))
+      return deny(
+        state,
+        policy,
+        query,
+        'POLICY_DENY',
+        consentRules.map((rule) => rule.rule_id),
+      );
+    allowedRules.push(...consentRules);
+  }
+  // Nothing above issues an endpoint allow. Only the complete two-sided success is
+  // registered, binding the original rename resource (both paths) and both rule sets.
+  const consentRules = [...new Map(allowedRules.map((rule) => [rule.rule_id, rule])).values()];
   const policyDigest = state.canonicalSha256(policy.provenance);
   const queryProjection = {
     policy_binding_digest_sha256: policyDigest,

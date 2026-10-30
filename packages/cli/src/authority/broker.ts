@@ -7,6 +7,8 @@ import { parseSourceManifest } from '../commands/source/manifest.js';
 import { parseReconciliationHostInput } from './reconciliation-host-input.js';
 import { reconciliationPackageWitness } from './reconciliation-package-witness.js';
 import { parseAdopterPolicyBinding } from '../services/adopter-policy-binding.js';
+import { loadDocumentationImplementationContext } from './documentation-context.js';
+import { documentationImplementationOwnsPath } from '@devai-nyx/authority';
 import { randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -70,6 +72,8 @@ import {
   buildTrustedAuthoritySources,
   repositoryIdFor,
   buildProspectiveAuthoritySources,
+  buildMaterializationAuthoritySources,
+  buildBootstrapAuthoritySources,
   canonicalBytes,
   canonicalSha256,
   sha256Bytes,
@@ -300,12 +304,9 @@ function policyFor(input: BrokerInput, now: string) {
   if (installedConstitution !== null && installedConstitution.version === null) {
     throw new Error('AUTHORITY_BOOTSTRAP_CONSTITUTION_VERSION_MISSING');
   }
-  const sources = buildTrustedAuthoritySources(
-    input.entries,
-    input.repository_root,
-    input.package_version,
-    installedConstitution?.text,
-  );
+  const sources = (
+    input.bootstrap_policy ? buildBootstrapAuthoritySources : buildTrustedAuthoritySources
+  )(input.entries, input.repository_root, input.package_version, installedConstitution?.text);
   if (input.bootstrap_policy) return { policy: sources.virtualPolicy, sources };
 
   const path = resolve(input.repository_root, POLICY_PATH);
@@ -314,6 +315,9 @@ function policyFor(input: BrokerInput, now: string) {
     { document },
     {
       now,
+      ...(Object.hasOwn(sources.immutableCore.source_document, 'documentation_implementation')
+        ? { documentationContext: loadDocumentationImplementationContext(input.repository_root) }
+        : {}),
       validatePolicySchema,
       canonicalBytes,
       canonicalSha256,
@@ -927,6 +931,14 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     input.entries.map((entry) => (entry.name === input.entry.name ? input.entry : entry)),
   );
   let { policy, sources } = policyFor(input, now);
+  const documentation =
+    input.bootstrap_policy ||
+    !Object.hasOwn(sources.immutableCore.source_document, 'documentation_implementation')
+      ? undefined
+      : loadDocumentationImplementationContext(repositoryRoot);
+  const assertDocumentationFresh = () => {
+    documentationImplementationOwnsPath(documentation, '');
+  };
   const constitutionBootstrap = isConstitutionBootstrap(input);
   const issuer = createAuthorityDecisionIssuer({
     issuer_id: 'devai-cli-authority',
@@ -1158,16 +1170,19 @@ export function createAuthorityHostBroker(input: BrokerInput): {
       },
       lstat: (path: string) => snapshot(repositoryRoot, path),
       writeAtomic: () => {
+        assertDocumentationFresh();
         if (!effectApply) throw new Error('AUTHORITY_EFFECT_APPLY_MISSING');
         effectResult = effectApply();
         return `authority-boundary:${invocationId}`;
       },
       renameAtomic: () => {
+        assertDocumentationFresh();
         if (!effectApply) throw new Error('AUTHORITY_EFFECT_APPLY_MISSING');
         effectResult = effectApply();
         return `authority-boundary:${invocationId}`;
       },
       applyAtomic: () => {
+        assertDocumentationFresh();
         if (!exactUnitApply) throw new Error('AUTHORITY_ATOMIC_UNIT_APPLY_MISSING');
         return exactUnitApply();
       },
@@ -1348,6 +1363,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
     apply: () => unknown,
     effectSymbol?: string,
   ): unknown => {
+    assertDocumentationFresh();
     assertProtectedReleasePrepareCapacityEffect(issuer);
     assertProtectedReleaseExportCapacityEffect(issuer);
     effectCounter += 1;
@@ -1569,6 +1585,7 @@ export function createAuthorityHostBroker(input: BrokerInput): {
 
   let sourceOperationUsed = false;
   const applyEffect = (request: AuthorityHostEffectRequest, apply: () => unknown): unknown => {
+    assertDocumentationFresh();
     assertProtectedReleasePrepareCapacityEffect(issuer);
     assertProtectedReleaseExportCapacityEffect(issuer);
     const sourceAction = /^source apply (architect|engineer|inspector)$/u.exec(input.entry.name);
@@ -2211,7 +2228,11 @@ export function createAuthorityHostBroker(input: BrokerInput): {
             : undefined;
           const currentSources =
             projection?.sources ??
-            buildTrustedAuthoritySources(input.entries, repositoryRoot, input.package_version);
+            buildMaterializationAuthoritySources(
+              input.entries,
+              repositoryRoot,
+              input.package_version,
+            );
 
           const policyPath = resolve(repositoryRoot, POLICY_PATH);
           // The existing policy is never an authority for its own replacement.

@@ -1,3 +1,4 @@
+import type { DocumentationImplementationContext } from '@devai-nyx/authority';
 import { minimatch } from 'minimatch';
 import { classifyTranslationPath } from './path-authority.js';
 
@@ -17,6 +18,7 @@ interface TestExecution {
 }
 
 interface EvaluationInput {
+  readonly documentation_authority?: DocumentationImplementationContext;
   readonly witness: {
     readonly strategy: TranslationStrategy;
     readonly touched: readonly string[];
@@ -70,8 +72,9 @@ function stateKey(change: StateChange): string {
 function roleAllowsPath(
   role: EvaluationInput['witness']['frame']['authority_role'],
   path: string,
+  documentation?: DocumentationImplementationContext,
 ): boolean {
-  return classifyTranslationPath(role, path).allowed;
+  return classifyTranslationPath(role, path, documentation).allowed;
 }
 
 export function evaluateTranslationFrames(input: EvaluationInput): FrameEvaluation {
@@ -142,7 +145,9 @@ export function evaluateTranslationFrames(input: EvaluationInput): FrameEvaluati
     ),
     frame(
       'authority',
-      input.diff_paths.every((path) => roleAllowsPath(input.witness.frame.authority_role, path)),
+      input.diff_paths.every((path) =>
+        roleAllowsPath(input.witness.frame.authority_role, path, input.documentation_authority),
+      ),
       'Candidate diff crosses the declared role authority.',
     ),
     frame('test-weakening', input.weakening_clean, 'Candidate weakens test evidence.'),
