@@ -169,11 +169,16 @@ export function registeredDocumentationRepository() {
   put('docs/site/schema.js', 'export {};\n');
   const seed = commit('docs: seed genuine registered binding fixture');
 
-  function bind(files: readonly string[] | null = SELECTED, commitBinding = true) {
+  function bind(
+    files: readonly string[] | null = SELECTED,
+    commitBinding = true,
+    policyFields: Readonly<Record<string, unknown>> = {},
+  ) {
     put(
       SOURCE,
       JSON.stringify(
         {
+          ...policyFields,
           schemaVersion: '1.0.0',
           policy_id: 'inspector.commit-documentation',
           policy_version: '1.0.0',

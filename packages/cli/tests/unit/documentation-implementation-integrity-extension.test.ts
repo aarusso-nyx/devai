@@ -458,6 +458,36 @@ describe('complete native integrity and unchanged canonical reconstruction', () 
       expect(after).toEqual(integrated);
       expect([...current.canonicalBytes(after)]).toEqual([...baseline.canonicalBytes(integrated)]);
       expect(after.additiveExtensions.length).toBe(mode === 'documentation-and-adopter' ? 2 : 1);
+      const receipt = parsed(root, RECEIPT);
+      const materialized = receipt['materialized'];
+      record(materialized);
+      const snapshot = new Map(
+        [RECEIPT, POLICY, '.devai/pin/constitution.md', SOURCE, ...Object.keys(materialized)].map(
+          (path) => [path, readFileSync(join(root, path))],
+        ),
+      );
+      const { verifyDocumentationBindingSnapshot } =
+        await import('../../src/authority/documentation-binding.js');
+      expect(() =>
+        verifyDocumentationBindingSnapshot({
+          files: snapshot,
+          document: parsed(root, SOURCE),
+          bound: receipt['documentation_implementation'],
+          sourceBytes: text(root, SOURCE),
+          frameworkVersion: version,
+          entries,
+          authorityDefaults: JSON.parse(
+            readFileSync(
+              join(
+                import.meta.dirname,
+                '../../../../law/policy/adopter-defaults/path-authority-classes.json',
+              ),
+              'utf8',
+            ),
+          ),
+        }),
+      ).not.toThrow();
+
       if (mode === 'without-block') {
         expect(a.cli.loadDocumentationImplementationContext(root)).toBeUndefined();
         expect(() => a.native.loadBoundDocumentationImplementation(root)).toThrow(
