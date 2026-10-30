@@ -67,3 +67,5 @@ export * from './runtime/policy-core-rules.js';
 export * from './runtime/policy-additive-rules.js';
 export * from './runtime/policy-adopter-extension.js';
 export * from './runtime/policy-sources.js';
+
+export { isAuthorityPolicySnapshotConsistent } from './runtime/policy-integrity.js';

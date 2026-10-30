@@ -199,13 +199,25 @@ export function resolveReleasePolicySnapshot(input: {
       ...ADOPTER_POLICY_TARGETS,
       ...(parsedBinding.binding.documentation_implementation === undefined
         ? []
-        : [PIN, '.devai/config/authority-policy.json']),
+        : [
+            PIN,
+            '.devai/config/authority-policy.json',
+            '.devai/config/adopter-policy-binding.journal.json',
+          ]),
     ]) {
       if (candidate.paths.includes(path)) files.set(path, candidate.read(path));
     }
     const binding = verifyAdopterPolicyBindingSnapshot({
       files,
       frameworkVersion: expected.installed_package.version,
+      ...(parsedBinding.binding.documentation_implementation === undefined
+        ? {}
+        : {
+            authorityDefaults: tools.parse(
+              'path-authority-classes.schema.json',
+              tools.readJson('dist/law/policy/adopter-defaults/path-authority-classes.json'),
+            ),
+          }),
       validatePolicy: (document) => {
         tools.parse('adopter-policy.schema.json', document);
         return true;
