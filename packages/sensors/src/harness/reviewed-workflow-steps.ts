@@ -440,7 +440,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'packages/authority/src/boundaries/reconciliation-host-namespace.ts',
-        sha256: '44e2abbeb68f0b771e8f82e34d745bfc0435bf532cd2ae710118978339588484',
+        sha256: 'beb8dd9a5eb2bed3d50452a6305f1deedd7f84ee2ab40fdf3c2002ddd8b58e19',
       },
       {
         path: 'packages/authority/src/boundaries/reconciliation-host-operation.ts',
