@@ -24,6 +24,10 @@ packages/cli/vendor/evidence-verification/
 # Fixed mutation compatibility fixture bytes have an explicit checksum contract.
 packages/cli/tests/fixtures/mutation-toolchain/
 
+# Frozen bytes: documentation-authority-fixture-integrity.test.ts checks hashes/population.
+packages/cli/tests/fixtures/documentation-authority-baseline/**
+packages/cli/tests/fixtures/documentation-authority-current-main-baseline/**
+
 # Third-party site dependency; preserve the separately reviewed upstream patch.
 docs/site/vendor/
 

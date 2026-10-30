@@ -19,6 +19,9 @@ export default tseslint.config(
       'packages/cli/vendor/evidence-verification/**',
       // Fixed compatibility inputs are verified by mutation-toolchain-fixture.test.ts.
       'packages/cli/tests/fixtures/mutation-toolchain/**',
+      // Frozen bytes: documentation-authority-fixture-integrity.test.ts checks hashes/population.
+      'packages/cli/tests/fixtures/documentation-authority-baseline/**',
+      'packages/cli/tests/fixtures/documentation-authority-current-main-baseline/**',
     ],
   },
   js.configs.recommended,

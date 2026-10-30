@@ -13,7 +13,6 @@ scratch/*
 !.devai/state/.gitkeep
 !.devai/state/backlog/
 !.devai/state/backlog/**
-.devai/config/authority-policy.json
 .devai/worktrees/*
 !.devai/worktrees/.gitkeep
 
