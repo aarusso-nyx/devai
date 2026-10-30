@@ -516,7 +516,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'packages/authority/src/index.ts',
-        sha256: '37ea35841988fdb3febed5f8a640c7cd20d39ba751895ec02be5576938d3b515',
+        sha256: '0244dea29f93a09949b8924b4d6d02b1e5f56584f396f8b96220480035aed961',
       },
       {
         path: 'packages/authority/src/paths.ts',
@@ -580,7 +580,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'packages/authority/src/runtime/policy-integrity.ts',
-        sha256: '337b5da7b9ddb24a3766c5e2931309a96029f317052ad10a7479779b6c5aee4e',
+        sha256: 'e0250f7dec1018708fe96d49c03e4da9e19a83377a890b861374e95ddf7c0e5b',
       },
       {
         path: 'packages/authority/src/runtime/policy-loader.ts',

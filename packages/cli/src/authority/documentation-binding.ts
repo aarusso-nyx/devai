@@ -3,6 +3,16 @@ import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { getValidator } from '@devai-nyx/schemas';
 import {
+  isAuthorityPolicySnapshotConsistent,
+  prepareAuthoritySourceRules,
+  completeAuthoritySources,
+  prepareBoundAdopterAuthoritySource,
+  parseBoundAdopterAuthoritySource,
+  prepareBoundAdopterAuthorityCompilation,
+  boundAdopterAuthorityCompilePrefix,
+  completeBoundAdopterAuthorityCompilation,
+  classWriteVerbs,
+  type BoundAdopterAuthorityExtension,
   DOCUMENTATION_IMPLEMENTATION_CAPABILITY,
   documentationImplementationProvenanceValid,
   type DocumentationImplementationProvenance,
@@ -141,6 +151,7 @@ export function verifyDocumentationBindingSnapshot(input: {
   readonly sourceBytes: string;
   readonly frameworkVersion: string;
   readonly entries: readonly RegistryEntry[];
+  readonly authorityDefaults?: unknown;
 }): void {
   if (input.document['documentation_implementation'] === undefined && input.bound === undefined)
     return;
@@ -176,4 +187,82 @@ export function verifyDocumentationBindingSnapshot(input: {
       entry['rule_id'].startsWith('core-documentation-implementation-'),
   );
   if (canonicalSha256(specialized) !== canonicalSha256(compiled.rules)) fail();
+  // Subset equality is not complete policy integrity. Reconstruct every canonical
+  // rule from the verified snapshot and package defaults; never mint a context here.
+  const receiptBytes = input.files.get('.devai/config/adopter-policy-binding.json');
+  const projectBytes = input.files.get('.devai/config/project.json');
+  if (receiptBytes === undefined || projectBytes === undefined) fail();
+  const parsed = parseAdopterPolicyBinding(new TextDecoder().decode(receiptBytes));
+  const project: unknown = JSON.parse(new TextDecoder().decode(projectBytes));
+  if (
+    'reason' in parsed ||
+    !record(project) ||
+    !getValidator('project-config.schema.json')(project)
+  )
+    fail();
+  if (
+    canonicalSha256(parsed.binding.documentation_implementation) !== canonicalSha256(bound) ||
+    parsed.binding.source_digest_sha256 !== bound.source_digest_sha256 ||
+    canonicalSha256(JSON.parse(input.sourceBytes)) !== canonicalSha256(input.document) ||
+    input.files.has('.devai/config/adopter-policy-binding.journal.json') ||
+    project['devai_version'] !== input.frameworkVersion ||
+    !record(project['constitution']) ||
+    project['constitution']['version'] !== bound.constitution.version ||
+    project['constitution']['sha256'] !== bound.constitution.digest_sha256 ||
+    (typeof project['name'] === 'string' &&
+      project['name'].trim().replaceAll(/[^A-Za-z0-9._-]/gu, '-') !== bound.repository_id)
+  )
+    fail();
+  const bindings = {
+    repository_id: bound.repository_id,
+    package_binding: bound.framework_package,
+    constitution_binding: bound.constitution,
+  };
+  const documentation = { ...compiled, provenance: bound };
+  const request = prepareBoundAdopterAuthoritySource(parsed.binding);
+  let adopter: BoundAdopterAuthorityExtension;
+  if (request.status !== 'source') adopter = request;
+  else {
+    if (
+      input.files.get(request.sourcePath) === undefined ||
+      new TextDecoder().decode(input.files.get(request.sourcePath)) !== input.sourceBytes
+    )
+      fail();
+    const source = parseBoundAdopterAuthoritySource(request, input.sourceBytes);
+    if (source.status !== 'validate') fail();
+    const prepared = prepareBoundAdopterAuthorityCompilation(source);
+    if (prepared.status !== 'compile') adopter = prepared;
+    else {
+      const defaults = input.authorityDefaults;
+      if (
+        !getValidator('path-authority-classes.schema.json')(defaults) ||
+        !record(defaults) ||
+        !record(defaults['classes']) ||
+        !record(defaults['classes']['test'])
+      )
+        fail();
+      const selectors = defaults['classes']['test']['selectors'];
+      if (
+        !Array.isArray(selectors) ||
+        selectors.some((value: unknown) => typeof value !== 'string')
+      )
+        fail();
+      adopter = completeBoundAdopterAuthorityCompilation({
+        prepared,
+        prefix: boundAdopterAuthorityCompilePrefix(prepared, {
+          constitutionVersion: bound.constitution.version,
+        }),
+        defaultTestSelectors: selectors as string[],
+        repositoryId: bound.repository_id,
+        classWriteVerbs: classWriteVerbs(input.entries),
+      });
+    }
+  }
+  const sources = completeAuthoritySources({
+    bindings,
+    documentation,
+    adopter,
+    prepared: prepareAuthoritySourceRules(input.entries, bindings, documentation),
+  });
+  if (!isAuthorityPolicySnapshotConsistent(policy, sources)) fail();
 }

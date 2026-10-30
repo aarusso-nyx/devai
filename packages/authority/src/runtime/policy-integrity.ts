@@ -1,3 +1,6 @@
+import { getValidator } from '@devai-nyx/schemas';
+import { canonicalBytes, canonicalSha256, sha256Bytes } from './policy-construction.js';
+import type { completeAuthoritySources } from './policy-sources.js';
 import { deepFreeze, equal, failure, isRecord, validInstant, type AnyRecord } from './contracts.js';
 import { AUTHORITY_POLICY_MATERIALIZED_PATH } from '../paths.js';
 
@@ -234,4 +237,39 @@ export function validateAuthorityPolicyIntegrity(input: unknown, deps: unknown) 
     value: { policy: value, documentation, specializedRules },
   };
   return result;
+}
+
+/** Pure consistency check for immutable offline bytes. It returns no policy or runtime context. */
+export function isAuthorityPolicySnapshotConsistent(
+  document: unknown,
+  sources: ReturnType<typeof completeAuthoritySources>,
+): boolean {
+  try {
+    const checked = validateAuthorityPolicyIntegrity(
+      { document },
+      {
+        now: new Date().toISOString(),
+        validatePolicySchema: (value: unknown) =>
+          getValidator('authority-policy.schema.json')(value)
+            ? {
+                ok: true,
+                value: { raw: value, canonical_bytes: canonicalBytes(value), view: value },
+              }
+            : failure('refused', 'AUTHORITY_POLICY_SCHEMA_INVALID'),
+        canonicalBytes,
+        canonicalSha256,
+        sha256Bytes,
+        immutableCore: sources.immutableCore,
+        additiveExtensions: sources.additiveExtensions,
+        expected_repository_id: sources.repository_id,
+        expected_policy_id: sources.provenance.policy_id,
+        expected_package: sources.package_binding,
+        expected_constitution: sources.constitution_binding,
+        expected_minimum_policy_version: sources.provenance.policy_version,
+      },
+    );
+    return isRecord(checked) && checked.ok === true;
+  } catch {
+    return false;
+  }
 }

@@ -144,6 +144,7 @@ export interface AdopterPolicyBindingSnapshot {
 export function verifyAdopterPolicyBindingSnapshot(input: {
   readonly files: ReadonlyMap<string, Uint8Array>;
   readonly frameworkVersion: string;
+  readonly authorityDefaults?: unknown;
   readonly validatePolicy: (document: unknown) => boolean;
   readonly validateProject: (document: unknown) => boolean;
   readonly materialize: (input: {
@@ -203,6 +204,7 @@ export function verifyAdopterPolicyBindingSnapshot(input: {
       sourceBytes: source.toString('utf8'),
       frameworkVersion: input.frameworkVersion,
       entries: canonicalRegistry(),
+      authorityDefaults: input.authorityDefaults,
     });
     const expected = input.materialize({
       policy,
