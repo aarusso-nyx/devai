@@ -1,11 +1,26 @@
 {
   "schemaVersion": "1.0.0",
+  "documentation_implementation": {
+    "capability_id": "documentation-executable-core-v1",
+    "repository_id": "devai",
+    "source_digest_sha256": "a783da7d3c486e5f89d891ed56c1347f167d1e86ed93bc03a6d45559c4b4019d",
+    "constitution": {
+      "version": "1.2.1",
+      "digest_sha256": "4dbb9caa8961cf3bbf8070faf7525711b018b1aaa3b47b17ae9a85f55cf4b57c"
+    },
+    "framework_package": {
+      "name": "@aarusso-nyx/devai",
+      "version": "2.9.0"
+    },
+    "compiled_digest_sha256": "8d9e796d2f01a1f272f9e9249773ef5a348d0f0bd527f6d19a0bb17b279199c3",
+    "rule_count": 1
+  },
   "policy_id": "devai.devai-adoption",
-  "policy_version": "1.3.0",
+  "policy_version": "1.3.1",
   "source_path": "law/policy/devai-adoption.json",
-  "source_digest_sha256": "bea07d2450757501b04c652c9393f3595cc944eae880ea4286efce1b6594dab0",
+  "source_digest_sha256": "a783da7d3c486e5f89d891ed56c1347f167d1e86ed93bc03a6d45559c4b4019d",
   "materialized": {
-    ".devai/config/project.json": "81c504f7b6c7f320f68f7912a252c53f8176a9a944daae140f866da694947155",
+    ".devai/config/project.json": "669c7c58c4b782bb1cdb0e81e613a6b63b2863752636adfa4a514ca737a4fdfd",
     ".devai/config/domains.json": "9539eb0e6679d423fa83b98726136eb369202edb042fce68eae92b19f543f6fd",
     ".devai/config/thresholds.json": "4662c41fbbce00db9e887be3f44f7f799e9bee587cb74dccb86e68eca3e4e9f4",
     ".devai/config/scorecard-na.json": "a7eeaecd4147efab2a6a40621cf2d87955c947d0739a13093d2baa93096488a2",

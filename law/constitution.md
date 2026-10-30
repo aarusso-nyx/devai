@@ -1,19 +1,19 @@
 ---
 id: CONSTITUTION
-title: DEVAI Constitution 1.2.0
+title: DEVAI Constitution 1.2.1
 type: constitution
 status: active
-date: 2026-10-24
+date: 2026-10-25
 authority: Architect
 supersedes: null
 superseded_by: null
 ---
 
-# DEVAI Constitution — 1.2.0
+# DEVAI Constitution — 1.2.1
 
 ## Status and scope
 
-**Version:** 1.2.0
+**Version:** 1.2.1
 **Status:** active
 
 This is the immutable axiom set for DEVAI. Every other artifact in the framework — contracts, charters, skills, bootstrap layout, scorecard — derives from these axioms and may not contradict them.
@@ -83,12 +83,12 @@ Some cells in the aspect grid are degenerate (e.g., Inventory × Idiomaticity) a
 
 Authority is enforced by filesystem path for every write performed through the DEVAI runtime. The runtime refuses writes that violate this mapping before mutation. The mutation call-site denominator is mechanically derived; it admits zero unauthorized sites and zero exemptions, and the derivation gate must demonstrably fail on stale fixtures. Editors, shells, and external agents outside the runtime require a declared host-enforcement adapter; DEVAI must report that boundary rather than imply control it does not possess.
 
-Core authority is decided by a fixed path prefix of at most two segments — a table lookup, never a wildcard rule with a default remainder:
+Core authority is decided by a fixed path prefix of at most two segments, with only the explicitly defined documentation-implementation specialization below using finite exact file identities. No wildcard remainder or inferred file-presence rule may create authority:
 
 - `law/` — Architect (F1-law: constitution, register, ADRs, schemas, invariants, trace, policy sources; `law/glossary/` joint with Owner).
 - `product/` — Owner (F1-business: journeys, use-cases, stories, rules, mandates).
 - `.devai/local/rounds/` — role-bounded runtime round state; each role writes only its declared task or audit output through an authorized action.
-- `docs/` — Architect (published human documentation).
+- `docs/` — Architect (published human documentation), except the finite executable implementation files admitted by the documentation-implementation specialization below; those files are Engineer-owned. Test and architectural-specification authority is never transferred by this specialization.
 - `record/` — machine only: `record/derived/` (F4) is written only by the regeneration subsystem; `record/proofs/` is appended only by executing verbs, hash-linked, attributed to the verb and committed by the session that produced it. A human edit under `record/` is an authority violation regardless of role.
 
 At an explicitly Owner-approved unresolved Git merge, a registered machine evidence-reconciliation verb may materialize the complete canonical chain of one exact published parent as the active merge result only after it has durably preserved and hash-verified the complete chains, proof epochs and ancestry of every displaced parent and the common base. This is a narrowly declared canonical-selection exception to append-only storage, not permission to edit, truncate, reorder, resequence, splice or re-record any source history or proof epoch. The Inspector-initiated verb must bind the exact parents, semantic index, source manifests, selected canonical prefix and immutable custody receipts, refuse every unapproved delta, and append a distinct canonical-selection evidence entry to the selected prefix through the normal machine writer before publishing the result. Every displaced active event remains explicitly archival; missing proof anchors require their separately authorized supported recovery. No human or client extension may exercise or widen this exception.
@@ -100,6 +100,8 @@ At an explicitly Owner-approved unresolved Git merge, a registered machine evide
 - `scratch/` — ephemeral; never committed beyond its README; content graduates only by an explicit role-authored commit to a governed tree.
 - Root prose files (`README.md`, `CLAUDE.md`, `AGENTS.md`) — Architect.
 - Host-tool configuration directories (`.changeset/`, `.claude/`, and peers) — path fixed by the toolchain; contents classified by this table per content class (agent permission policy is F5-host under Architect authority; runtime directories are scratch-class).
+
+Documentation implementation is a package-defined core specialization, not an additive extension or an exemption from Article 10. A newer canonical constitution and authority implementation may admit an explicit, finite list of repository-relative executable implementation files under `docs/`, from a versioned Architect-authored policy source approved for that exact list and bound through a registered initialization action. Entries are exact normalized file paths, never roots, directories, wildcards, prefixes or inferred extension-wide grants. Protected tests and architecture/specification paths cannot be selected; ambiguity is refused. Only Engineer principals and Engineer-bound workers receive the implementation write actions on the selected files. All unselected documentation remains Architect-owned, and existing test authority remains Inspector-owned. Every authority consumer must use the same validated, digest-bound specialization; stale, missing, altered or incompatible source/binding data refuses the affected grant before mutation. Without the explicit source and supported bound constitution, the existing core mapping remains unchanged. Article 10 continues to prohibit Architect code edits and Engineer specification edits; Engineer test edits remain limited to the existing focused-regression verb of Article 7, withheld in independent-assurance tasks. This specialization neither expands nor narrows that existing test authority.
 
 Clients may extend the path mapping for client-specific disciplines through a declared, versioned, and bound extension. An extension names its roots explicitly; no root is inferred from a directory's existence, and a root never equals or contains a core-table prefix. Under a declared root, authority is decided by path class in a fixed order: the architecture class (schema definitions, blueprints, and the architectural specifications the extension names) is Architect; the test class (test directories and colocated test files) is Inspector, with the Engineer's focused-regression verb of Article 7; every remaining path under the root, including local implementation documentation, is Engineer. A class rule takes precedence over the root grant, the architecture class over the test class, and two extension rules that would grant different roles at the same precedence are ambiguous: the write is refused. Extensions are additive: they never alter, narrow, or shadow a core row, and the core mapping is immutable at a given constitution version. An extension is materialized only through a registered binding action from a validated, digest-bound source and is verified at every write; an extension whose source is absent, invalid, or unbound fails closed, and no grant survives it.
 

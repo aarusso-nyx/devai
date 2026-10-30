@@ -1,7 +1,10 @@
 {
   "schemaVersion": "1.0.0",
   "policy_id": "devai.devai-adoption",
-  "policy_version": "1.3.0",
+  "policy_version": "1.3.1",
+  "documentation_implementation": {
+    "files": ["docs/site/src/pages/index.tsx"]
+  },
   "project": {
     "project_type": "runtime-host",
     "repo": {
