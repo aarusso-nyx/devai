@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import {
   constants,
   openSync,
@@ -9,7 +10,6 @@ import {
   realpathSync,
   opendirSync,
   fsyncSync,
-  statfsSync,
   type BigIntStats,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -134,9 +134,29 @@ export function readNativeDirectory(
   return directoryIdentity(stat);
 }
 export function assertNativeProvisionFilesystem(paths: NativeReconciliationPaths): void {
-  // This is the actual qualified native envelope, not a claim about every VFS.
+  // Darwin assigns numeric VFS types at registration time. Query the actual
+  // f_fstypename through the system df's exact APFS filter, never a numeric ID.
   const existing = optionalStat(paths.private_root) ? paths.private_root : paths.git_dir;
-  if (process.platform !== 'darwin' || statfsSync(existing, { bigint: true }).type !== 26n)
+  const filesystem =
+    process.platform === 'darwin'
+      ? spawnSync('/bin/df', ['-T', 'apfs', existing], {
+          env: { PATH: '/usr/bin:/bin', LC_ALL: 'C' },
+          timeout: 1000,
+          maxBuffer: 8192,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          shell: false,
+        })
+      : null;
+  if (
+    !filesystem ||
+    filesystem.error ||
+    filesystem.signal !== null ||
+    filesystem.status !== 0 ||
+    typeof filesystem.stdout !== 'string' ||
+    !filesystem.stdout.trim() ||
+    filesystem.stderr !== ''
+  )
     provisionFail('RECONCILIATION_PROVISION_UNSUPPORTED');
 }
 export function readNativePrivateFile(path: string): PrivateFile {
