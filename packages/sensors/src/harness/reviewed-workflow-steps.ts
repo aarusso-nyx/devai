@@ -351,10 +351,6 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
         sha256: '29967669ec962e6c1250df3708a31fa1909bb396d1a8f1df759d715153d01b00',
       },
       {
-        path: 'scripts/check-commit-range.mjs',
-        sha256: '37870c542dd18b3196fdcac121e3944e94f4506c501f8a35e9714e5cb654d39d',
-      },
-      {
         path: 'packages/authority/src/adapters.ts',
         sha256: '5d5ab8e019440ed6c721f8d16b17bb6c3aeeb2c61f36a9057eb01f2cef046f0a',
       },
