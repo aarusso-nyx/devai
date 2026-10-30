@@ -529,6 +529,28 @@
             ".devai/config/adopter-policy-binding.json",
             ".devai/config/authority-policy.json"
           ]
+        },
+        {
+          "id": "MIG-2.9.0-constitution-1-2-1-documentation-implementation",
+          "kind": "constitution",
+          "summary": "Constitution 1.2.1 adds the exact documentation implementation core specialization. A versioned Architect-authored adopter policy may explicitly list finite executable files under docs/ for Engineer implementation authority, excluding protected tests and architectural specifications. Existing unselected docs authority, focused-regression limits, proof-reconciliation/index safeguards and all other declared inputs remain unchanged. Full constitution review and explicit registered binding are required; upgrading does not invent a file list, provision reconciliation, recover proofs, publish artifacts or grant downstream acceptance.",
+          "decision_records": ["ADR-AUT-0010"],
+          "segments": ["constitution", "adopter-policy", "authority"],
+          "files": [
+            ".devai/pin/constitution.md",
+            ".devai/config/project.json",
+            ".devai/config/adopter-policy-binding.json",
+            ".devai/config/authority-policy.json"
+          ],
+          "decision_required": true,
+          "constitution": {
+            "from": "1.2.0",
+            "to": "1.2.1"
+          },
+          "obligation": {
+            "check": "constitution-version",
+            "requirement": "Review ADR-AUT-0010 and the complete adopter pin delta to the exact installed Constitution 1.2.1 (SHA-256 4dbb9caa8961cf3bbf8070faf7525711b018b1aaa3b47b17ae9a85f55cf4b57c), then explicitly request init upgrade --constitution (or init bind --constitution). Documentation implementation additionally requires the exact approved finite policy list and registered adopter-policy binding; no list is inferred."
+          }
         }
       ]
     }
