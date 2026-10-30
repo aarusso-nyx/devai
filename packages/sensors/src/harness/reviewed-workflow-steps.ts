@@ -1626,7 +1626,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'scripts/run-native-apfs-tests.mjs',
-        sha256: '61e676681663d533c3c0fbc6a755407ccb38b15fb3e8e6700ec96a47a05e5b43',
+        sha256: 'e8454a1fee57dda534a0d7dc89cc5a3e175d5355495f55aaa80464f01565ee3a',
       },
     ],
   },
