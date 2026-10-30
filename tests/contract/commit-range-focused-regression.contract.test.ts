@@ -3,7 +3,8 @@
 // the commit adds or modifies, never deletes, that imports, through a relative or workspace
 // import, a file under `packages/` the same commit changes. Inspector commits on those paths are
 // judged exactly as before. The verb exists from constitution 1.1.0 (ADR-GOV-0026), so a
-// repository whose constitution is older admits only the Inspector there.
+// repository whose constitution is older admits only the Inspector there; the pinned
+// `.devai/pin/constitution.md` decides before the framework source `law/constitution.md`.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -47,6 +48,7 @@ const SEED: Readonly<Record<string, string>> = {
         default: './dist/index.js',
       },
       './extra': { default: './dist/extra.js' },
+      './dist/*': './dist/*.js',
     },
   })}\n`,
   'packages/x/src/index.ts': "export { a } from './a.js';\n",
@@ -81,7 +83,7 @@ interface Commit {
   readonly deletes?: readonly string[];
 }
 
-function repository(version = '1.1.0') {
+function repository(version = '1.1.0', pin?: string) {
   const cwd = mkdtempSync(join(tmpdir(), 'devai-commit-range-focused-'));
   roots.push(cwd);
   const git = (args: readonly string[], as: Identity = ARCHITECT) =>
@@ -117,6 +119,7 @@ function repository(version = '1.1.0') {
   }
   for (const [path, content] of Object.entries(SEED)) put(path, content);
   put('law/constitution.md', constitution(version));
+  if (pin !== undefined) put('.devai/pin/constitution.md', constitution(pin));
   git(['add', '-A']);
   // The seed is the base, outside every range under test.
   git(['commit', '--no-verify', '-qm', 'docs: seed the fixture']);
@@ -148,14 +151,14 @@ function repository(version = '1.1.0') {
   return { git, commit, check };
 }
 
-function expectAdmitted(spec: Commit, version?: string): void {
-  const r = repository(version);
+function expectAdmitted(spec: Commit, version?: string, pin?: string): void {
+  const r = repository(version, pin);
   const result = r.check(r.commit(spec));
   expect(result.status, result.output).toBe(0);
 }
 
-function expectRefused(spec: Commit, version?: string): string {
-  const r = repository(version);
+function expectRefused(spec: Commit, version?: string, pin?: string): string {
+  const r = repository(version, pin);
   const sha = r.commit(spec);
   const result = r.check(sha);
   expect(result.status, result.output).not.toBe(0);
@@ -229,9 +232,36 @@ describe('ADR-CHK-0009 IA-001: an Engineer commit holding a source and its adjac
       },
     });
   });
+
+  it('admits a test whose import matches a wildcard export key and names the changed source', () => {
+    expectAdmitted({
+      author: ENGINEER,
+      message: 'fix(x): change a with a regression test through its wildcard export',
+      files: {
+        ...CHANGED_A,
+        'packages/x/tests/unit/a-wildcard.test.ts': testImporting('@fixture/x/dist/a'),
+      },
+    });
+  });
 });
 
 describe('ADR-CHK-0009 IA-002: an Engineer test that imports nothing the commit changed is refused', () => {
+  it.each(['%2e', '%2e%2e', '%6eode_modules', '%61', '%2f'])(
+    'refuses an encoded wildcard capture %s despite a changed literal file',
+    (segment) => {
+      expectRefused({
+        author: ENGINEER,
+        message: 'fix(x): change a literal encoded path with a regression test',
+        files: {
+          [`packages/x/src/${segment}/a.ts`]: 'export const a = 2;\n',
+          'packages/x/tests/unit/encoded-wildcard.test.ts': testImporting(
+            `@fixture/x/dist/${segment}/a`,
+          ),
+        },
+      });
+    },
+  );
+
   it('refuses a test that imports only an unchanged source', () => {
     const output = expectRefused({
       author: ENGINEER,
@@ -242,6 +272,17 @@ describe('ADR-CHK-0009 IA-002: an Engineer test that imports nothing the commit 
       },
     });
     expect(output).toContain('packages/x/tests/unit/b-more.test.ts');
+  });
+
+  it('refuses a test whose wildcard export import names only an unchanged source', () => {
+    expectRefused({
+      author: ENGINEER,
+      message: 'fix(x): change a and add a wildcard test of b',
+      files: {
+        ...CHANGED_A,
+        'packages/x/tests/unit/b-wildcard.test.ts': testImporting('@fixture/x/dist/b'),
+      },
+    });
   });
 
   it('refuses a modified existing test that does not import the changed source', () => {
@@ -381,5 +422,24 @@ describe('the focused-regression verb needs constitution 1.1.0', () => {
       },
       '1.2.0',
     );
+  });
+});
+
+describe('the pinned constitution decides before the framework source', () => {
+  const ADJACENT: Commit = {
+    author: ENGINEER,
+    message: 'fix(x): change a with its regression test',
+    files: {
+      ...CHANGED_A,
+      'packages/x/tests/unit/a-regression.test.ts': testImporting('../../src/a.js'),
+    },
+  };
+
+  it('refuses the IA-001 commit while the pin is 1.0.2 and law/constitution.md is 1.1.0', () => {
+    expectRefused(ADJACENT, '1.1.0', '1.0.2');
+  });
+
+  it('admits the IA-001 commit while the pin is 1.1.0 and law/constitution.md is 1.0.2', () => {
+    expectAdmitted(ADJACENT, '1.0.2', '1.1.0');
   });
 });
