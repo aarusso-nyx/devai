@@ -194,10 +194,16 @@ async function inScope<T>(callback: () => Promise<T>): Promise<T> {
   }
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+const sleep = async (ms: number): Promise<void> => {
+  const deadline = performance.now() + ms;
+  // Node timers may fire just before their requested delay. Keep the fixture's
+  // minimum work duration real so the unchanged 600 ms assertion is meaningful.
+  while (performance.now() < deadline) {
+    await new Promise<void>((resolve) =>
+      setTimeout(resolve, Math.max(1, deadline - performance.now())),
+    );
+  }
+};
 
 interface Behavior {
   readonly delayMs?: number;
