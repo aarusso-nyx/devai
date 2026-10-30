@@ -86,6 +86,20 @@ function archive(files: readonly ReleasePackageFile[]): Buffer {
   return gzipSync(Buffer.concat([...chunks, Buffer.alloc(1024)]));
 }
 
+// Synthetic v1.5 profile generation predates documentation opt-in. Keep it
+// independent of the immutable v1.4 files and of this checkout's current policy.
+function syntheticV15Policy(): Buffer {
+  const bytes = readFileSync(
+    join(
+      ROOT,
+      'packages/cli/tests/fixtures/framework-adoption-pre-selfbinding-35ba43e4.json.fixture',
+    ),
+  );
+  if (sha256(bytes) !== 'bea07d2450757501b04c652c9393f3595cc944eae880ea4286efce1b6594dab0')
+    throw new Error('synthetic v1.5 policy digest mismatch');
+  return bytes;
+}
+
 function frozen(path: string): Buffer {
   const document = FROZEN_DOCUMENTS[path];
   if (document === undefined) throw new Error('historical mutation fixture path unknown');
@@ -97,17 +111,36 @@ function frozen(path: string): Buffer {
 
 export function installedPackage(
   extraFiles: readonly ReleasePackageFile[] = [],
-  options: { readonly current?: boolean } = {},
+  options: { readonly current?: boolean; readonly owningCurrent?: boolean } = {},
 ): ReleasePackageSnapshot {
-  const version = options.current ? '1.5.0' : VERSION;
+  const owningManifest = options.owningCurrent
+    ? readFileSync(join(ROOT, 'packages/cli/package.json'))
+    : undefined;
+  const version =
+    owningManifest === undefined
+      ? options.current
+        ? '1.5.0'
+        : VERSION
+      : JSON.parse(owningManifest.toString('utf8')).version;
   const schemaRoot = join(ROOT, 'law/schemas');
   const policyRoot = join(ROOT, 'law/policy');
   const files: ReleasePackageFile[] = [
     ...extraFiles,
+    ...(options.owningCurrent
+      ? [
+          {
+            path: 'dist/law/policy/adopter-defaults/path-authority-classes.json',
+            mode: 0o644,
+            bytes: readFileSync(
+              join(ROOT, 'law/policy/adopter-defaults/path-authority-classes.json'),
+            ),
+          },
+        ]
+      : []),
     {
       path: 'package.json',
       mode: 0o644,
-      bytes: Buffer.from(JSON.stringify({ name: PACKAGE, version }), 'utf8'),
+      bytes: owningManifest ?? Buffer.from(JSON.stringify({ name: PACKAGE, version }), 'utf8'),
     },
     {
       path: 'dist/law/constitution.md',
@@ -260,14 +293,22 @@ export function fixture(
   installed = installedPackage(),
   options: {
     readonly current?: boolean;
+    readonly owningCurrentPolicy?: boolean;
     readonly profileOverrides?: Readonly<Record<string, unknown>>;
   } = {},
 ): Fixture {
-  const version = options.current ? '1.5.0' : VERSION;
+  const version = options.owningCurrentPolicy
+    ? installed.identity.version
+    : options.current
+      ? '1.5.0'
+      : VERSION;
   const policy = JSON.parse(
-    (options.current ? readFileSync(join(ROOT, POLICY_PATH)) : frozen(POLICY_PATH)).toString(
-      'utf8',
-    ),
+    (options.owningCurrentPolicy
+      ? readFileSync(join(ROOT, POLICY_PATH))
+      : options.current
+        ? syntheticV15Policy()
+        : frozen(POLICY_PATH)
+    ).toString('utf8'),
   ) as Record<string, unknown>;
   if (options.profileOverrides)
     policy['release_verification'] = {

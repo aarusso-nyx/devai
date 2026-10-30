@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "1.0.0",
+  "policy_id": "devai.devai-adoption",
+  "policy_version": "1.3.0",
+  "project": {
+    "project_type": "runtime-host",
+    "repo": {
+      "kind": "library"
+    },
+    "docs": {
+      "builder": "docusaurus"
+    }
+  },
+  "scorecard_na": {
+    "schemaVersion": "1.0.0",
+    "cells": [
+      {
+        "cell": "F1:T1",
+        "reason": "Contract validation has no live emitter, so contract_validation is explicitly N/A rather than presented as reachable.",
+        "constitution_anchor": "Article 5"
+      },
+      {
+        "cell": "F4:T5",
+        "reason": "Inventory x Idiomaticity is the degenerate cell Article 5 names: inventory artifacts are derived deterministically from F1, F2 and F3 and never authored, so idiomaticity has no authored subject to measure.",
+        "constitution_anchor": "Article 5"
+      }
+    ]
+  },
+  "glob_guards": {
+    "schemaVersion": "1.0.0",
+    "guards": [
+      {
+        "id": "SCHEMAS_DIR",
+        "pattern": "law/schemas/*.schema.json",
+        "min_matches": 35,
+        "description": "Schema type generation and package staging must retain the complete current schema roster.",
+        "source": "packages/schemas/src/roster.ts"
+      }
+    ]
+  },
+  "release_verification": {
+    "schemaVersion": "1.4.0",
+    "policy_id": "devai.release-verification",
+    "policy_version": "1.4.0",
+    "release_unit": "@aarusso-nyx/devai",
+    "version_source": "packages/cli/package.json",
+    "default_support": "current",
+    "required_check": "devai-release-gate",
+    "capability_tasks": {
+      "formatting-hygiene": ["format"],
+      "lint": ["lint"],
+      "type-integrity": ["typecheck"],
+      "schema-consistency": ["generate", "test:schemas"],
+      "secret-scan": ["release:static-integrity"],
+      "path-portability": ["release:static-integrity"],
+      "package-integrity": ["release:closure"],
+      "exact-candidate": ["release:static-integrity"],
+      "affected-checks": ["release:affected-anchor"],
+      "dependent-checks": ["release:affected-anchor"],
+      "build-integrity": ["build"],
+      "unit": ["test:local-full"],
+      "integration": ["test:root", "test:cli"],
+      "e2e": ["test:cli"],
+      "consumer": ["test:skills", "test:cli"],
+      "api-compatibility": ["test:cli"],
+      "migration": ["test:cli"],
+      "rollback": ["test:cli"],
+      "adopter-materialization": ["test:cli"],
+      "security": ["test:authority", "test:evidence"],
+      "database": ["test:root"],
+      "tenancy": ["test:authority"],
+      "provenance": ["test:evidence", "release:closure"],
+      "reproducibility": ["release:closure"],
+      "operational-matrix": ["test:local-full"]
+    },
+    "risk_capabilities": {},
+    "mutation_roster": []
+  }
+}

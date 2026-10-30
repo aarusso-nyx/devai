@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseConstitutionVersion } from '@devai-nyx/skills';
+import {
+  frozenReconciliationConstitution,
+  projectReconciliationConstitution,
+} from '../helpers/constitution-history.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const read = (path: string): string => readFileSync(resolve(ROOT, path), 'utf8');
@@ -14,7 +18,7 @@ const INSERTIONS = [
 
 describe('REC-B1-A canonical-selection contract authoring', () => {
   it('changes only two Article 6 paragraphs, version markers and amendment date', () => {
-    const source = read('law/constitution.md');
+    const source = projectReconciliationConstitution(read('law/constitution.md'));
     expect(parseConstitutionVersion(source)).toBe('1.2.0');
     let predecessor = source;
     const start = source.indexOf('### Article 6.');
@@ -35,14 +39,15 @@ describe('REC-B1-A canonical-selection contract authoring', () => {
     );
   });
 
-  it('requires real successor pin parity before integration (binding approval held)', () => {
+  it('requires genuine adopted successor pin and policy parity while retaining the exact historical projection', () => {
     const source = read('law/constitution.md');
     const pin = read('.devai/pin/constitution.md');
-    expect(parseConstitutionVersion(pin)).toBe('1.2.0');
+    expect(parseConstitutionVersion(pin)).toBe('1.2.1');
+    expect(projectReconciliationConstitution(pin)).toBe(frozenReconciliationConstitution());
     expect(pin).toBe(source);
     const policy = JSON.parse(read('.devai/config/authority-policy.json')) as {
       constitution: { version: string; digest_sha256: string };
     };
-    expect(policy.constitution).toEqual({ version: '1.2.0', digest_sha256: sha256(source) });
+    expect(policy.constitution).toEqual({ version: '1.2.1', digest_sha256: sha256(source) });
   });
 });

@@ -26,6 +26,12 @@ import { bindReleaseHostPackageSnapshot } from '../../src/services/release-host-
 import { invokeDevaiCli } from '../../src/release-host.js';
 import { createProtectedReleaseHostRunner } from '../../src/services/release-protected-host-runner.js';
 import { verifyReleaseCandidateSnapshot } from '../../src/services/release-candidate-snapshot.js';
+import { resolveReleasePolicySnapshot } from '../../src/services/release-policy-resolution.js';
+import { buildResolvedReleasePlanReceipt } from '../../src/services/release-lifecycle.js';
+import {
+  createReleasePolicyClosure,
+  verifyReleasePolicyClosure,
+} from '../../src/services/release-policy-closure.js';
 import { validateReleaseLifecycleRequest } from '../../src/services/release-lifecycle-execution.js';
 
 const ROOT = process.env.DEVAI_TEST_ROOT;
@@ -161,14 +167,24 @@ try {
       ),
     },
   ];
-  const installed = installedPackage(extras, { current: true });
+  const installed = installedPackage(extras, { current: true, owningCurrent: true });
+  const owningVersion = installed.identity.version;
   bindReleaseHostPackageSnapshot(installed);
-  const base = fixture(installed, { current: true, profileOverrides: { mutation_roster: [] } });
+  const base = fixture(installed, {
+    current: true,
+    owningCurrentPolicy: true,
+    profileOverrides: { mutation_roster: [] },
+  });
+  const documentation = JSON.parse(
+    base.files.get('law/policy/devai-adoption.json').toString('utf8'),
+  ).documentation_implementation;
+  assert.deepEqual(documentation.files, ['docs/site/src/pages/index.tsx']);
+  for (const path of documentation.files) base.files.set(path, readFileSync(join(ROOT, path)));
   // A none-carrier still prepares the sole publishable CLI unit; this is not a
   // mutation-roster entry and must remain present in the candidate snapshot.
   base.files.set(
     'packages/cli/package.json',
-    Buffer.from(JSON.stringify({ name: '@aarusso-nyx/devai', version: '1.5.0' })),
+    Buffer.from(JSON.stringify({ name: '@aarusso-nyx/devai', version: owningVersion })),
   );
   // The generic mutation fixture derives its descriptor from the mutation
   // roster. A `none` plan has no mutation entries, while the genuine preflight
@@ -215,6 +231,8 @@ try {
   const bound = await invokeDevaiCli([
     'init',
     'bind',
+    '--adopter-policy',
+    'law/policy/devai-adoption.json',
     '--target',
     bindingRoot,
     '--as-role',
@@ -226,6 +244,17 @@ try {
     '.devai/config/authority-policy.json',
     readFileSync(join(bindingRoot, '.devai/config/authority-policy.json')),
   );
+  const receiptPath = '.devai/config/adopter-policy-binding.json';
+  const receiptBytes = readFileSync(join(bindingRoot, receiptPath));
+  const receipt = JSON.parse(receiptBytes.toString('utf8'));
+  assert.equal(receipt.documentation_implementation.framework_package.version, owningVersion);
+  assert.equal(receipt.documentation_implementation.repository_id, 'candidate');
+  base.files.set(receiptPath, receiptBytes);
+  for (const [path, digest] of Object.entries(receipt.materialized)) {
+    const bytes = readFileSync(join(bindingRoot, path));
+    assert.equal(hash(bytes), digest);
+    base.files.set(path, bytes);
+  }
   rmSync(bindingRoot, { recursive: true, force: true });
   const baseFiles = new Map(base.files);
   baseFiles.set(
@@ -244,7 +273,7 @@ try {
     schemaVersion: '1.0.0',
     release_unit: '@aarusso-nyx/devai',
     current_version: '1.4.5',
-    target_version: '1.5.0',
+    target_version: owningVersion,
     support: 'current',
     change_kind: 'metadata',
     changed_paths: ['packages/cli/package.json'],
@@ -253,6 +282,54 @@ try {
     candidate: { commit: snapshot.repository.commit, tree: snapshot.repository.tree },
     base: { commit: baseSnapshot.repository.commit, tree: baseSnapshot.repository.tree },
   };
+  // Genuine registered documentation binding must survive the exported immutable proof.
+  const resolution = resolveReleasePolicySnapshot({
+    expected,
+    installed_package: installed,
+    candidate: snapshot,
+  });
+  const documentationPlan = buildResolvedReleasePlanReceipt({ resolution, intent });
+  const closure = createReleasePolicyClosure({ plan: documentationPlan, resolution });
+  const closureLimits = {
+    maximum_archive_bytes: 8 * 1024 * 1024,
+    maximum_unpacked_bytes: 8 * 1024 * 1024,
+    maximum_git_bytes: 8 * 1024 * 1024,
+    maximum_git_entries: 10000,
+  };
+  const reconstruct = (value) =>
+    verifyReleasePolicyClosure({
+      closure: value,
+      expected,
+      implementation: installed,
+      limits: closureLimits,
+    });
+  assert.deepEqual(reconstruct(closure).resolution, resolution.resolution);
+  const policyBlob = oid('blob', base.files.get('.devai/config/authority-policy.json'));
+  assert(
+    closure.evidence.candidate_objects.has(policyBlob),
+    'exported documentation policy blob is retained',
+  );
+  const missingPolicy = new Map(closure.evidence.candidate_objects);
+  missingPolicy.delete(policyBlob);
+  assert.throws(
+    () =>
+      reconstruct({
+        ...closure,
+        evidence: { ...closure.evidence, candidate_objects: missingPolicy },
+      }),
+    /^Error: rpl-policy-resolution-mismatch$/u,
+  );
+  const tamperedPolicy = new Map(closure.evidence.candidate_objects);
+  const originalPolicyObject = tamperedPolicy.get(policyBlob);
+  tamperedPolicy.set(policyBlob, { ...originalPolicyObject, bytes: Buffer.from('{}') });
+  assert.throws(
+    () =>
+      reconstruct({
+        ...closure,
+        evidence: { ...closure.evidence, candidate_objects: tamperedPolicy },
+      }),
+    /^Error: rpl-policy-resolution-mismatch$/u,
+  );
   const production = {
     snapshot,
     intent,
@@ -381,7 +458,7 @@ try {
       release_units: [
         {
           release_unit: '@aarusso-nyx/devai',
-          version: '1.5.0',
+          version: owningVersion,
           package_roster: [
             {
               package_id: '@aarusso-nyx/devai',

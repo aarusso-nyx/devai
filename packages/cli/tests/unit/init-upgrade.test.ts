@@ -17,7 +17,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withAuthorityHostTestScope } from '../../../skills/tests/unit/authority-host-test-scope.js';
 import {
@@ -29,6 +29,75 @@ import {
 import { UPGRADE_LOCK } from '../../src/commands/init/upgrade-lock.js';
 import { postMergeAdapterFiles } from '../../src/services/hooks-install/index.js';
 import { resolveCliVersion } from '../../src/version.js';
+import { frozen280MigrationManifest } from '../helpers/migration-history.js';
+import {
+  frozenReconciliationConstitution,
+  CURRENT_DOCUMENTATION_CONSTITUTION_SHA256,
+} from '../helpers/constitution-history.js';
+
+const ROOT = resolve(import.meta.dirname, '../../../..');
+function frozenPin(version: '1.0.2' | '1.1.0'): string {
+  const path =
+    version === '1.0.2'
+      ? 'packages/cli/tests/fixtures/constitution-a1521a78.md.txt'
+      : 'packages/cli/tests/fixtures/pre-b1-2df84159/law/constitution.md.txt';
+  const text = readFileSync(join(ROOT, path), 'utf8');
+  expect(createHash('sha256').update(text).digest('hex')).toBe(
+    version === '1.0.2'
+      ? 'd7f8791f1d00a7247bced66bdcdf8b1af431bb57e49d03b6ddd7024cb52f957d'
+      : '8353c3b81d38e0f9b913cbeb6762bc149605989c1b16f52d2c63ba9892f71270',
+  );
+  expect(text).toContain(`**Version:** ${version}`);
+  return text;
+}
+
+// Unit-only historical selectors: real planning, writes and doctor remain in use.
+// This does not qualify an installed published package.
+async function withHistorical280(run: () => Promise<void>): Promise<void> {
+  const frozen = frozenReconciliationConstitution();
+  const frozenPath = join(
+    ROOT,
+    'packages/cli/tests/fixtures/documentation-authority-current-main-baseline/canonical/law/constitution.md.txt',
+  );
+  vi.doMock('@devai-nyx/skills', async () => {
+    const actual = await vi.importActual<typeof import('@devai-nyx/skills')>('@devai-nyx/skills');
+    expect(actual.parseConstitutionVersion(frozen)).toBe('1.2.0');
+    return {
+      ...actual,
+      resolveCanonicalConstitution: () => ({
+        text: frozen,
+        version: '1.2.0',
+        sha256: 'd5dfdc972161e0f848dd859be7bbfa510973c5c9a449a0f9e6b8960e4f5ac96a',
+        source: 'bundled',
+        path: frozenPath,
+      }),
+    };
+  });
+  vi.doMock('../../src/version.js', async () => ({
+    ...(await vi.importActual<typeof import('../../src/version.js')>('../../src/version.js')),
+    resolveCliVersion: () => '2.8.0',
+  }));
+  vi.doMock('../../src/services/adopter-migrations.js', async () => {
+    const actual = await vi.importActual<typeof import('../../src/services/adopter-migrations.js')>(
+      '../../src/services/adopter-migrations.js',
+    );
+    return {
+      ...actual,
+      loadAdopterMigrations: () => actual.parseAdopterMigrations(frozen280MigrationManifest()),
+    };
+  });
+  try {
+    vi.resetModules();
+    expect((await import('../../src/version.js')).resolveCliVersion()).toBe('2.8.0');
+    expect((await import('@devai-nyx/skills')).resolveCanonicalConstitution()?.text).toBe(frozen);
+    await run();
+  } finally {
+    vi.doUnmock('@devai-nyx/skills');
+    vi.doUnmock('../../src/version.js');
+    vi.doUnmock('../../src/services/adopter-migrations.js');
+    vi.resetModules();
+  }
+}
 
 type JsonObject = Record<string, unknown>;
 
@@ -397,62 +466,140 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     expect((value(retried)['plan'] as JsonObject)['refusals']).toEqual([pending]);
   }, 180_000);
 
-  it('refuses an unreviewed constitution move until --constitution settles it', async () => {
-    const repo = await stynxAt160(true);
-    const pin = readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8').replaceAll(
-      '1.2.0',
-      '1.0.2',
-    );
-    put(repo, '.devai/pin/constitution.md', pin);
-    const project = json(repo, '.devai/config/project.json');
-    put(repo, '.devai/config/project.json', {
-      ...project,
-      constitution: { version: '1.0.2', sha256: createHash('sha256').update(pin).digest('hex') },
-    });
+  it(
+    'refuses an unreviewed constitution move until --constitution settles it',
+    async () =>
+      withHistorical280(async () => {
+        const repo = await stynxAt160(true);
+        const pin = frozenPin('1.0.2');
+        put(repo, '.devai/pin/constitution.md', pin);
+        const project = json(repo, '.devai/config/project.json');
+        put(repo, '.devai/config/project.json', {
+          ...project,
+          constitution: {
+            version: '1.0.2',
+            sha256: createHash('sha256').update(pin).digest('hex'),
+          },
+        });
 
-    const refused = await runCli(WRITE(repo));
-    expect(refused.exit).toBe(5);
-    expect((JSON.parse(refused.stderr) as { error: JsonObject }).error).toMatchObject({
-      code: 'INIT_UPGRADE_DECISION_PENDING',
-      context: expect.objectContaining({
-        refusals: expect.arrayContaining([
-          expect.objectContaining({ change: 'MIG-2.7.0-constitution-1-1-0' }),
-          expect.objectContaining({ change: 'MIG-2.8.0-constitution-1-2-0' }),
-        ]),
+        const refused = await runCli(WRITE(repo));
+        expect(refused.exit).toBe(5);
+        expect((JSON.parse(refused.stderr) as { error: JsonObject }).error).toMatchObject({
+          code: 'INIT_UPGRADE_DECISION_PENDING',
+          context: expect.objectContaining({
+            refusals: expect.arrayContaining([
+              expect.objectContaining({ change: 'MIG-2.7.0-constitution-1-1-0' }),
+              expect.objectContaining({ change: 'MIG-2.8.0-constitution-1-2-0' }),
+            ]),
+          }),
+        });
+
+        const applied = await runCli([...WRITE(repo), '--constitution']);
+        expect(applied.exit, applied.stderr).toBe(0);
+        expect(json(repo, '.devai/config/project.json')['constitution']).toMatchObject({
+          version: '1.2.0',
+        });
+        expect(json(repo, RECEIPT)['constitution']).toEqual({ from: '1.0.2', to: '1.2.0' });
       }),
-    });
+    180_000,
+  );
 
-    const applied = await runCli([...WRITE(repo), '--constitution']);
-    expect(applied.exit, applied.stderr).toBe(0);
-    expect(json(repo, '.devai/config/project.json')['constitution']).toMatchObject({
-      version: '1.2.0',
-    });
-    expect(json(repo, RECEIPT)['constitution']).toEqual({ from: '1.0.2', to: '1.2.0' });
-  }, 180_000);
+  it(
+    'plans the 2.7.1 to 2.8.0 amendment without writes and requires explicit constitution review',
+    async () =>
+      withHistorical280(async () => {
+        const repo = await stynxAt160(true);
+        const pin = frozenPin('1.1.0');
+        put(repo, '.devai/pin/constitution.md', pin);
+        put(repo, '.devai/config/project.json', {
+          ...json(repo, '.devai/config/project.json'),
+          devai_version: '2.7.1',
+          constitution: {
+            version: '1.1.0',
+            sha256: createHash('sha256').update(pin).digest('hex'),
+          },
+        });
+        const before = snapshot(repo);
+        const plain = await runCli(PLAN(repo));
+        const plainPlan = value(plain)['plan'] as JsonObject;
+        expect(plainPlan['refusals']).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ change: 'MIG-2.8.0-constitution-1-2-0' }),
+          ]),
+        );
+        expect(snapshot(repo)).toEqual(before);
+        const explicit = await runCli([...PLAN(repo), '--constitution']);
+        expect(explicit.exit, explicit.stderr).toBe(0);
+        const plan = value(explicit)['plan'] as JsonObject;
+        expect(plan['refusals']).toEqual([]);
+        expect(plan['changed_files']).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              path: '.devai/pin/constitution.md',
+              segment: 'constitution',
+            }),
+          ]),
+        );
+        expect(snapshot(repo)).toEqual(before);
+        const applied = await runCli([...WRITE(repo), '--constitution']);
+        expect(applied.exit, applied.stderr).toBe(0);
+        expect(json(repo, '.devai/config/project.json')['constitution']).toMatchObject({
+          version: '1.2.0',
+        });
+        expect(json(repo, RECEIPT)['migrations']).toContain('MIG-2.8.0-constitution-1-2-0');
+        const settled = snapshot(repo);
+        expect((await runCli(WRITE(repo))).exit).toBe(0);
+        expect(snapshot(repo)).toEqual(settled);
+      }),
+    180_000,
+  );
 
-  it('plans the 2.7.1 to 2.8.0 amendment without writes and requires explicit constitution review', async () => {
+  it('plans the unmocked 2.8.0 to 2.9.0 candidate with explicit constitution review', async () => {
+    vi.resetModules();
+    const skills = await import('@devai-nyx/skills');
+    const actualSkills =
+      await vi.importActual<typeof import('@devai-nyx/skills')>('@devai-nyx/skills');
+    const version = await import('../../src/version.js');
+    const actualVersion =
+      await vi.importActual<typeof import('../../src/version.js')>('../../src/version.js');
+    expect(skills.resolveCanonicalConstitution).toBe(actualSkills.resolveCanonicalConstitution);
+    expect(version.resolveCliVersion).toBe(actualVersion.resolveCliVersion);
+    const migrations = await import('../../src/services/adopter-migrations.js');
+    const actualMigrations = await vi.importActual<
+      typeof import('../../src/services/adopter-migrations.js')
+    >('../../src/services/adopter-migrations.js');
+    expect(migrations.loadAdopterMigrations).toBe(actualMigrations.loadAdopterMigrations);
+    expect(version.resolveCliVersion()).toBe('2.9.0');
+    expect(skills.resolveCanonicalConstitution()).toMatchObject({
+      version: '1.2.1',
+      sha256: CURRENT_DOCUMENTATION_CONSTITUTION_SHA256,
+    });
     const repo = await stynxAt160(true);
-    const pin = readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8').replaceAll(
-      '1.2.0',
-      '1.1.0',
-    );
+    const pin = frozenReconciliationConstitution();
+    expect(skills.parseConstitutionVersion(pin)).toBe('1.2.0');
     put(repo, '.devai/pin/constitution.md', pin);
     put(repo, '.devai/config/project.json', {
       ...json(repo, '.devai/config/project.json'),
-      devai_version: '2.7.1',
-      constitution: { version: '1.1.0', sha256: createHash('sha256').update(pin).digest('hex') },
+      devai_version: '2.8.0',
+      constitution: { version: '1.2.0', sha256: createHash('sha256').update(pin).digest('hex') },
     });
     const before = snapshot(repo);
     const plain = await runCli(PLAN(repo));
-    const plainPlan = value(plain)['plan'] as JsonObject;
-    expect(plainPlan['refusals']).toEqual(
-      expect.arrayContaining([expect.objectContaining({ change: 'MIG-2.8.0-constitution-1-2-0' })]),
+    expect((value(plain)['plan'] as JsonObject)['refusals']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          change: 'MIG-2.9.0-constitution-1-2-1-documentation-implementation',
+        }),
+      ]),
     );
+    expect(snapshot(repo)).toEqual(before);
+    const refused = await runCli(WRITE(repo));
+    expect(refused.exit).toBe(5);
     expect(snapshot(repo)).toEqual(before);
     const explicit = await runCli([...PLAN(repo), '--constitution']);
     expect(explicit.exit, explicit.stderr).toBe(0);
     const plan = value(explicit)['plan'] as JsonObject;
-    expect(plan['refusals']).toEqual([]);
+    expect(plan).toMatchObject({ from: '2.8.0', to: '2.9.0', refusals: [] });
     expect(plan['changed_files']).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ path: '.devai/pin/constitution.md', segment: 'constitution' }),
@@ -461,10 +608,16 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
     expect(snapshot(repo)).toEqual(before);
     const applied = await runCli([...WRITE(repo), '--constitution']);
     expect(applied.exit, applied.stderr).toBe(0);
-    expect(json(repo, '.devai/config/project.json')['constitution']).toMatchObject({
-      version: '1.2.0',
+    expect(json(repo, '.devai/config/project.json')['constitution']).toEqual({
+      version: '1.2.1',
+      sha256: CURRENT_DOCUMENTATION_CONSTITUTION_SHA256,
     });
-    expect(json(repo, RECEIPT)['migrations']).toContain('MIG-2.8.0-constitution-1-2-0');
+    expect(json(repo, RECEIPT)).toMatchObject({
+      from: '2.8.0',
+      to: '2.9.0',
+      constitution: { from: '1.2.0', to: '1.2.1' },
+      migrations: ['MIG-2.9.0-constitution-1-2-1-documentation-implementation'],
+    });
     const settled = snapshot(repo);
     expect((await runCli(WRITE(repo))).exit).toBe(0);
     expect(snapshot(repo)).toEqual(settled);
@@ -937,118 +1090,120 @@ describe('#390: init upgrade rebinds a 2.3.1 observation workflow to the script-
   }, 180_000);
 });
 
-describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.9.0', () => {
-  it('projects opted-in sensor inputs, rebinds the task template, and repeats without a byte change', async () => {
-    const repo = await stynxAt160(true);
-    expect((await runCli(WRITE(repo))).exit).toBe(0);
-    const project = json(repo, '.devai/config/project.json');
-    put(repo, '.devai/config/project.json', { ...project, devai_version: '2.3.2' });
-    const adapter = json(repo, '.devai/config/github-actions-host-adapter.json');
-    put(repo, '.devai/config/github-actions-host-adapter.json', {
-      ...adapter,
-      adapter_version: '2.3.2',
-      package_binding: { name: '@aarusso-nyx/devai', version: '2.3.2' },
-    });
-    const effectsPath = '.devai/config/subprocess-effects.json';
-    const effects = json(repo, effectsPath);
-    put(repo, effectsPath, {
-      ...effects,
-      templates: (effects['templates'] as JsonObject[]).filter(
-        (template) => template['template_id'] !== 'declared-sensor-task',
-      ),
-    });
-    const sensorInputs = {
-      schemaVersion: '1.0.0',
-      inputs: { inventory_routes: { framework: 'angular', scanDirs: ['apps/angular'] } },
-    };
-    mkdirSync(join(repo, 'apps/angular'), { recursive: true });
-    put(repo, SOURCE, {
-      ...json(repo, SOURCE),
-      policy_version: '1.1.0',
-      sensor_inputs: sensorInputs,
-    });
-    rmSync(join(repo, RECEIPT));
-    const before = snapshot(repo);
-    const planned = await runCli(PLAN(repo));
-    expect(planned.exit, planned.stderr).toBe(0);
-    expect(snapshot(repo)).toEqual(before);
-    const plan = value(planned)['plan'] as JsonObject;
-    expect(plan).toMatchObject({ from: '2.3.2', to: '2.9.0', status: 'ready' });
-    expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toEqual([
-      '2.4.0',
-      '2.5.0',
-      '2.6.0',
-      '2.6.1',
-      '2.6.2',
-      '2.6.3',
-      '2.6.4',
-      '2.7.0',
-      '2.8.0',
-      '2.9.0',
-    ]);
-    expect(plan['changed_files']).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          path: '.devai/config/sensor-inputs.json',
-          segment: 'adopter-policy',
-        }),
-        expect.objectContaining({ path: effectsPath, segment: 'subprocess-effects' }),
-        expect.objectContaining({
-          path: '.devai/config/authority-policy.json',
-          segment: 'authority',
-        }),
-      ]),
-    );
-    const applied = await runCli(WRITE(repo));
-    expect(applied.exit, applied.stderr).toBe(0);
-    expect(json(repo, '.devai/config/sensor-inputs.json')).toEqual(sensorInputs);
-    const binding = json(repo, '.devai/config/adopter-policy-binding.json');
-    expect(
-      (binding['materialized'] as Record<string, string>)['.devai/config/sensor-inputs.json'],
-    ).toBe(
-      createHash('sha256')
-        .update(readFileSync(join(repo, '.devai/config/sensor-inputs.json')))
-        .digest('hex'),
-    );
-    expect(
-      (json(repo, effectsPath)['templates'] as JsonObject[]).filter(
-        (template) => template['template_id'] === 'declared-sensor-task',
-      ),
-    ).toEqual([
-      expect.objectContaining({
-        capabilities: ['proc:declared-sensor-task', 'fs:workspace', 'fs:f5-state'],
+describe('ADR-SCR-0015/0017: init upgrade from 2.3.2 through 2.8.0', () => {
+  it(
+    'projects opted-in sensor inputs, rebinds the task template, and repeats without a byte change',
+    async () =>
+      withHistorical280(async () => {
+        const repo = await stynxAt160(true);
+        expect((await runCli(WRITE(repo))).exit).toBe(0);
+        const project = json(repo, '.devai/config/project.json');
+        put(repo, '.devai/config/project.json', { ...project, devai_version: '2.3.2' });
+        const adapter = json(repo, '.devai/config/github-actions-host-adapter.json');
+        put(repo, '.devai/config/github-actions-host-adapter.json', {
+          ...adapter,
+          adapter_version: '2.3.2',
+          package_binding: { name: '@aarusso-nyx/devai', version: '2.3.2' },
+        });
+        const effectsPath = '.devai/config/subprocess-effects.json';
+        const effects = json(repo, effectsPath);
+        put(repo, effectsPath, {
+          ...effects,
+          templates: (effects['templates'] as JsonObject[]).filter(
+            (template) => template['template_id'] !== 'declared-sensor-task',
+          ),
+        });
+        const sensorInputs = {
+          schemaVersion: '1.0.0',
+          inputs: { inventory_routes: { framework: 'angular', scanDirs: ['apps/angular'] } },
+        };
+        mkdirSync(join(repo, 'apps/angular'), { recursive: true });
+        put(repo, SOURCE, {
+          ...json(repo, SOURCE),
+          policy_version: '1.1.0',
+          sensor_inputs: sensorInputs,
+        });
+        rmSync(join(repo, RECEIPT));
+        const before = snapshot(repo);
+        const planned = await runCli(PLAN(repo));
+        expect(planned.exit, planned.stderr).toBe(0);
+        expect(snapshot(repo)).toEqual(before);
+        const plan = value(planned)['plan'] as JsonObject;
+        expect(plan).toMatchObject({ from: '2.3.2', to: '2.8.0', status: 'ready' });
+        expect((plan['releases'] as JsonObject[]).map((release) => release['version'])).toEqual([
+          '2.4.0',
+          '2.5.0',
+          '2.6.0',
+          '2.6.1',
+          '2.6.2',
+          '2.6.3',
+          '2.6.4',
+          '2.7.0',
+          '2.8.0',
+        ]);
+        expect(plan['changed_files']).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              path: '.devai/config/sensor-inputs.json',
+              segment: 'adopter-policy',
+            }),
+            expect.objectContaining({ path: effectsPath, segment: 'subprocess-effects' }),
+            expect.objectContaining({
+              path: '.devai/config/authority-policy.json',
+              segment: 'authority',
+            }),
+          ]),
+        );
+        const applied = await runCli(WRITE(repo));
+        expect(applied.exit, applied.stderr).toBe(0);
+        expect(json(repo, '.devai/config/sensor-inputs.json')).toEqual(sensorInputs);
+        const binding = json(repo, '.devai/config/adopter-policy-binding.json');
+        expect(
+          (binding['materialized'] as Record<string, string>)['.devai/config/sensor-inputs.json'],
+        ).toBe(
+          createHash('sha256')
+            .update(readFileSync(join(repo, '.devai/config/sensor-inputs.json')))
+            .digest('hex'),
+        );
+        expect(
+          (json(repo, effectsPath)['templates'] as JsonObject[]).filter(
+            (template) => template['template_id'] === 'declared-sensor-task',
+          ),
+        ).toEqual([
+          expect.objectContaining({
+            capabilities: ['proc:declared-sensor-task', 'fs:workspace', 'fs:f5-state'],
+          }),
+        ]);
+        expect(json(repo, RECEIPT)).toMatchObject({
+          from: '2.3.2',
+          to: '2.8.0',
+          migrations: [
+            'MIG-2.4.0-sensor-inputs-projection',
+            'MIG-2.4.0-declared-sensor-task-template',
+            'MIG-2.5.0-audit-interface-projections',
+            'MIG-2.5.0-complete-test-result-population',
+            'MIG-2.5.0-trusted-verifier-2-4',
+            'MIG-2.6.0-read-only-workflow-inventory',
+            'MIG-2.6.0-selected-post-merge-hook',
+            'MIG-2.6.1-runtime-repair-identity-refresh',
+            'MIG-2.6.2-runtime-repair-identity-refresh',
+            'MIG-2.6.3-measurement-repair-identity-refresh',
+            'MIG-2.6.4-native-reporter-identity-refresh',
+            'MIG-2.7.0-constitution-1-1-0',
+            'MIG-2.8.0-constitution-1-2-0',
+          ],
+          postchecks: [
+            { name: 'policy-materialization-current', ok: true },
+            { name: 'authority-enforcement', ok: true },
+            { name: 'constitution-binding', ok: true },
+          ],
+        });
+        const settled = snapshot(repo);
+        const again = await runCli(WRITE(repo));
+        expect(again.exit, again.stderr).toBe(0);
+        expect((value(again)['plan'] as JsonObject)['status']).toBe('no-op');
+        expect(snapshot(repo)).toEqual(settled);
       }),
-    ]);
-    expect(json(repo, RECEIPT)).toMatchObject({
-      from: '2.3.2',
-      to: '2.9.0',
-      migrations: [
-        'MIG-2.4.0-sensor-inputs-projection',
-        'MIG-2.4.0-declared-sensor-task-template',
-        'MIG-2.5.0-audit-interface-projections',
-        'MIG-2.5.0-complete-test-result-population',
-        'MIG-2.5.0-trusted-verifier-2-4',
-        'MIG-2.6.0-read-only-workflow-inventory',
-        'MIG-2.6.0-selected-post-merge-hook',
-        'MIG-2.6.1-runtime-repair-identity-refresh',
-        'MIG-2.6.2-runtime-repair-identity-refresh',
-        'MIG-2.6.3-measurement-repair-identity-refresh',
-        'MIG-2.6.4-native-reporter-identity-refresh',
-        'MIG-2.7.0-constitution-1-1-0',
-        'MIG-2.8.0-constitution-1-2-0',
-        'MIG-2.9.0-role-bound-source-actions',
-        'MIG-2.9.0-source-authority-rebind',
-      ],
-      postchecks: [
-        { name: 'policy-materialization-current', ok: true },
-        { name: 'authority-enforcement', ok: true },
-        { name: 'constitution-binding', ok: true },
-      ],
-    });
-    const settled = snapshot(repo);
-    const again = await runCli(WRITE(repo));
-    expect(again.exit, again.stderr).toBe(0);
-    expect((value(again)['plan'] as JsonObject)['status']).toBe('no-op');
-    expect(snapshot(repo)).toEqual(settled);
-  }, 180_000);
+    180_000,
+  );
 });

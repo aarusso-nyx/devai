@@ -1,0 +1,127 @@
+{
+  "purpose": "Frozen independent original classifiers and pre-refactor canonical reconstruction, not production code. Do not replace with candidate implementation.",
+  "sourceBase": "2df84159caabf869b866fb2a05e5b06be83295fb",
+  "fixtures": [
+    {
+      "fixture": "canonical/packages/cli/src/authority/policy.ts",
+      "originalSource": "packages/cli/src/authority/policy.ts",
+      "sha256": "cd6069e896346bfb7d3a24e2a50b2b0ccd209d5623d66b36667cad52a8d76988",
+      "proof": "retained pre-refactor source snapshot; pre-refactor-bindings.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/authority/policy-support.ts",
+      "originalSource": "packages/cli/src/authority/policy-support.ts",
+      "sha256": "f4914ef10a230ac5aeae0d662919af6a57052476a66d9eb096460049cd9c7ebb",
+      "proof": "retained pre-refactor source snapshot; pre-refactor-bindings.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/define-command.ts",
+      "originalSource": "packages/cli/src/define-command.ts",
+      "sha256": "01ec7445af67ce2624b0a0ca457c84974bba0d7b064772774e10f74f6c4071ba",
+      "proof": "actual dependency bytes equal successful source31 stage custody; refactor-stage1/worktree-before.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/generated/action-registry.ts",
+      "originalSource": "packages/cli/src/generated/action-registry.ts",
+      "sha256": "e0b037c48a817d471453a99894e230a2c4e43a1c913b0d8d6b7b4dc6b85523de",
+      "proof": "actual dependency bytes equal successful source31 stage custody; refactor-stage1/worktree-before.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/command-manifest.ts",
+      "originalSource": "packages/cli/src/command-manifest.ts",
+      "sha256": "5e112ae6785431ae33799bba66b12c7c00959014448d8501de551c734bddfc73",
+      "proof": "actual dependency bytes equal successful source31 stage custody; refactor-stage1/worktree-before.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/authority/policy-adopter-extension.ts",
+      "originalSource": "packages/cli/src/authority/policy-adopter-extension.ts",
+      "sha256": "531e85a5f7e55d9094c58d00d8bb1eff50c0daf055b6a6129a678198f23e9c82",
+      "proof": "retained pre-refactor source snapshot; pre-refactor-bindings.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/authority/policy-additive-rules.ts",
+      "originalSource": "packages/cli/src/authority/policy-additive-rules.ts",
+      "sha256": "7f0c37cffd48fea39436af1d7234394a03d90bcbcf218cff014f26a428581286",
+      "proof": "retained pre-refactor source snapshot; pre-refactor-bindings.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/authority/policy-core-rules.ts",
+      "originalSource": "packages/cli/src/authority/policy-core-rules.ts",
+      "sha256": "792533e69a9a6eff519811e25ab2d38d169d8ea87d018e990f488a1e44322d33",
+      "proof": "retained pre-refactor source snapshot; pre-refactor-bindings.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/authority/documentation-binding.ts",
+      "originalSource": "packages/cli/src/authority/documentation-binding.ts",
+      "sha256": "46b36df6b09869ee646fd4a52fcfcdcf3c7c73dc746b138f31075fd8c56f0bb0",
+      "proof": "retained pre-refactor source snapshot; pre-refactor-bindings.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/authority/policy-documentation-implementation.ts",
+      "originalSource": "packages/cli/src/authority/policy-documentation-implementation.ts",
+      "sha256": "7560dd72c004ce14342a3492169abab063603a8dff61c65fa69d759a2c4ba99f",
+      "proof": "retained pre-refactor source snapshot; pre-refactor-bindings.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/services/adopter-policy-binding.ts",
+      "originalSource": "packages/cli/src/services/adopter-policy-binding.ts",
+      "sha256": "1b4ae8d7487450f1c1e689495d15980355fcf777372ac08055edc449ef1f72a4",
+      "proof": "actual dependency bytes equal successful source31 stage custody; refactor-stage1/worktree-before.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/services/adopter-policy-ownership.ts",
+      "originalSource": "packages/cli/src/services/adopter-policy-ownership.ts",
+      "sha256": "f58c119b64891d6810b23a4b7e9a41c1580a902ccec824d722820926e9059b08",
+      "proof": "actual dependency bytes equal successful source31 stage custody; refactor-stage1/worktree-before.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/packages/cli/src/services/adopter-policy.ts",
+      "originalSource": "packages/cli/src/services/adopter-policy.ts",
+      "sha256": "f71bf7977cf5cebfd772fe8fbb78d702fdbe6e7db25cb284590d442bb0316b48",
+      "proof": "actual dependency bytes equal successful source31 stage custody; refactor-stage1/worktree-before.json",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "canonical/law/policy/adopter-defaults/path-authority-classes.json",
+      "originalSource": "law/policy/adopter-defaults/path-authority-classes.json",
+      "sha256": "7303f47cd1aec97a48e9bdfeb123843797692811ba5a0be95894a04af42af7c1",
+      "proof": "actual package-default asset equal source31 stage custody",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "default/scope/index.ts",
+      "originalSource": "packages/cli/src/services/write-scope/index.ts",
+      "sha256": "42b9718e081b2e4f4ec957bf8f5fce51c75b4e6e319c3fcae50b696dc373aa37",
+      "proof": "retained original default classifier snapshot",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "default/scope/import-adjacency.ts",
+      "originalSource": "packages/cli/src/services/write-scope/import-adjacency.ts",
+      "sha256": "6389d0be256e33d35253dccda2ade7d9f29f65f76c0cc4a0198d37a51f7b8734",
+      "proof": "unchanged actual original dependency; source31 stage custody",
+      "bytesUnchanged": true
+    },
+    {
+      "fixture": "default/path-authority.ts",
+      "originalSource": "packages/spec/src/translation-validation/path-authority.ts",
+      "sha256": "d300a27dfdf36037d26d59ae01d9abcba4d103ee8397df5f56b79c4bb6ab4eba",
+      "proof": "retained original default classifier snapshot",
+      "bytesUnchanged": true
+    }
+  ],
+  "packageDependencies": "Bare package imports intentionally resolve actual workspace packages under ordinary owning test resolution, just as the retained comparisons did. No fake declarations or package aliases.",
+  "assetLayout": "canonical/packages/cli/src/authority resolves ../../../../law/policy/adopter-defaults/path-authority-classes.json unchanged."
+}

@@ -8,6 +8,21 @@ import { ROOT, canonicalSha256, readJson, sha256 } from '../fixtures/governance-
 
 const ADR = 'ADR-EVI-0007';
 const CI_ADR = 'ADR-CHK-0010';
+const DOCUMENTATION_ADR = 'ADR-AUT-0010';
+const documentationFile = 'ADR-AUT-0010-exact-documentation-implementation.md';
+const documentationSubjects = [
+  'law/constitution.md',
+  'law/schemas/adopter-policy.schema.json',
+  'packages/authority/src/documentation-implementation.ts',
+  'packages/authority/src/runtime/policy-loader.ts',
+  'packages/authority/src/runtime/documentation-context.ts',
+  'scripts/check-commit-range.mjs',
+  'tests/contract/commit-range-registry-generated.contract.test.ts',
+  'docs/dev/operations/remote-preflight-contract.md',
+  'packages/cli/src/services/adopter-policy-binding.ts',
+  'packages/cli/src/services/write-scope/index.ts',
+  'packages/spec/src/translation-validation/path-authority.ts',
+];
 const RELEASE_ADR = 'ADR-REL-0036';
 const releaseFile = 'ADR-REL-0036-devai-rc-coverage-time-budget.md';
 const releaseSubjects = [
@@ -85,8 +100,10 @@ const sourceAdrFile = 'ADR-AUT-0009-exact-source-file-application.md';
 const currentPaths = readdirSync(adrRoot)
   .filter((name) => name.endsWith('.md'))
   .sort();
-const paths = currentPaths.filter((name) => name !== projectionFile && name !== sourceAdrFile);
-const records = paths.flatMap((name): AdrRecordFixture[] => {
+const paths = currentPaths.filter(
+  (name) => name !== projectionFile && name !== sourceAdrFile && name !== documentationFile,
+);
+const readRecord = (name: string): AdrRecordFixture[] => {
   const path = resolve(adrRoot, name);
   const exception = policy.exception_catalog.entries.find((entry) => entry.path === name);
   if (exception?.disposition === 'non-record') return [];
@@ -119,7 +136,8 @@ const records = paths.flatMap((name): AdrRecordFixture[] => {
       affected_rules: fm.affected_rules as string[],
     },
   ];
-});
+};
+const records = paths.flatMap(readRecord);
 const prior = historical.records.map((record): AdrRecordFixture => ({
   ...record,
   status: ['ADR-GOV-0027', 'ADR-AUT-0008'].includes(record.adr_id) ? 'accepted' : record.status,
@@ -158,7 +176,7 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
     expect(after.effective_authorities).toEqual(before.effective_authorities);
   });
   it('accounts separately for the proposed registry projection record without changing authority', () => {
-    expect(currentPaths).toHaveLength(paths.length + 2);
+    expect(currentPaths).toHaveLength(paths.length + 3);
     expect(currentPaths.filter((name) => name === projectionFile)).toEqual([projectionFile]);
     const text = readFileSync(resolve(adrRoot, projectionFile), 'utf8');
     const fm = parseYaml(/^---\n([\s\S]*?)\n---\n/u.exec(text)?.[1] ?? '') as Record<
@@ -194,7 +212,7 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
     expect(after.effective_authorities).toEqual(before.effective_authorities);
   });
   it('accounts separately for the proposed source application record without granting authority', () => {
-    expect(currentPaths).toHaveLength(paths.length + 2);
+    expect(currentPaths).toHaveLength(paths.length + 3);
     expect(currentPaths.filter((name) => name === sourceAdrFile)).toEqual([sourceAdrFile]);
     const text = readFileSync(resolve(adrRoot, sourceAdrFile), 'utf8');
     const fm = parseYaml(/^---\n([\s\S]*?)\n---\n/u.exec(text)?.[1] ?? '') as Record<
@@ -443,5 +461,54 @@ describe('ADR-EVI-0007 bounded authoring contract', () => {
       'shape or pure-codec test does not',
     ])
       expect(source).toContain(text);
+  });
+  it('extends the current provenance lineage with exact documentation authority', () => {
+    const current = [...records, ...readRecord(projectionFile), ...readRecord(sourceAdrFile)];
+    const added = readRecord(documentationFile);
+    expect(added).toEqual([
+      {
+        file: `law/adr/${documentationFile}`,
+        adr_id: DOCUMENTATION_ADR,
+        format: 'v2',
+        title: 'Exact documentation implementation core specialization',
+        status: 'accepted',
+        date: '2026-10-30',
+        supersedes: ['ADR-CHK-0012'],
+        affected_rules: documentationSubjects,
+      },
+    ]);
+    const before = resolveAdrFixture(current, currentPaths.length - 1);
+    const after = resolveAdrFixture([...current, ...added], currentPaths.length);
+    expect(before.ok).toBe(true);
+    expect(after.ok, JSON.stringify(after.errors)).toBe(true);
+    expect(before.adrs.find((row) => row.adr_id === 'ADR-CHK-0012')).toMatchObject({
+      effective: true,
+    });
+    expect(after.adrs.filter((row) => row.adr_id !== DOCUMENTATION_ADR)).toEqual(
+      before.adrs.map((row) =>
+        row.adr_id === 'ADR-CHK-0012'
+          ? { ...row, effective: false, effective_affected_rules: [] }
+          : row,
+      ),
+    );
+    expect(after.adrs.find((row) => row.adr_id === DOCUMENTATION_ADR)).toMatchObject({
+      effective: true,
+      effective_affected_rules: [
+        ...new Set([
+          ...documentationSubjects,
+          'tests/contract/commit-range-registry-generated.contract.test.ts',
+          'docs/dev/operations/remote-preflight-contract.md',
+        ]),
+      ].sort(),
+    });
+    expect(after.effective_authorities).toEqual(
+      [
+        ...before.effective_authorities.filter((id) => id !== 'ADR-CHK-0012'),
+        DOCUMENTATION_ADR,
+      ].sort(),
+    );
+    expect(after.adrs.find((row) => row.adr_id === 'ADR-AUT-0009')).toMatchObject({
+      effective: true,
+    });
   });
 });

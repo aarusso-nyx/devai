@@ -13,17 +13,17 @@ import {
   releasesInRange,
 } from '../../src/services/adopter-migrations.js';
 import { resolveCliVersion } from '../../src/version.js';
+import { frozen280MigrationManifest } from '../helpers/migration-history.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../..');
-const MANIFEST = JSON.parse(
+const CURRENT_MANIFEST = JSON.parse(
   readFileSync(join(ROOT, 'law/policy/adopter-migrations.json'), 'utf8'),
 ) as Record<string, unknown>;
-const manifest = loadAdopterMigrations();
-const historicalManifest = {
-  ...manifest,
-  releases: manifest.releases.filter((release) => release.version !== '2.9.0'),
-};
-const changes = manifest.releases.flatMap((release) => release.changes);
+const MANIFEST = frozen280MigrationManifest();
+const manifest = parseAdopterMigrations(MANIFEST);
+const currentManifest = loadAdopterMigrations();
+const historicalManifest = manifest;
+const changes = currentManifest.releases.flatMap((release) => release.changes);
 const decisionRecords = new Set(
   readdirSync(join(ROOT, 'law/adr'))
     .map((name) => /^(ADR-[A-Z]{3}-[0-9]{4})-/u.exec(name)?.[1])
@@ -70,6 +70,66 @@ const CONFIGURATION_NEUTRAL_CANDIDATES: ReadonlyMap<string, { from: string; reas
   ]);
 
 describe('#264: the adopter migration manifest', () => {
+  it('adds only the complete approved 2.9 candidate entry to the immutable 2.8 manifest', () => {
+    const successor = {
+      version: '2.9.0',
+      status: 'unreleased',
+      changes: [
+        {
+          id: 'MIG-2.9.0-role-bound-source-actions',
+          kind: 'new-action',
+          summary:
+            'Add preview source apply architect, source apply engineer and source apply inspector for one exact regular-file create or replacement under the matching declared role, explicit write consent and current bound path authority. Existing action contracts remain unchanged. No deletion, general editor adapter, protected path permission or automatic retry is added; cooperative final checks do not provide filesystem compare-and-swap or hostile parent-swap protection.',
+          decision_records: ['ADR-AUT-0009'],
+          segments: [],
+          files: [],
+        },
+        {
+          id: 'MIG-2.9.0-source-authority-rebind',
+          kind: 'rebind',
+          summary:
+            'After installing the exact published package, preview registered init upgrade and apply its reviewed write set with --as-role architect --write. It refreshes the project version and compiled authority policy; where an adopter policy source is bound, it reprojects that same source and refreshes its receipt and authority-extension binding. The new Inspector source rules cover tests/** and packages/*/tests/** without shadowing declared adopter test classes; a constructed Engineer task start request at a native test file is denied. Existing selected host-adapter bindings are refreshed by the ordinary upgrade when needed, as shown in the preview. Constitution pins, adopter declarations and protected histories are not silently changed. This rebind does not authorize product edits, publication or downstream acceptance.',
+          decision_records: ['ADR-AUT-0009'],
+          segments: ['adopter-policy', 'authority'],
+          files: [
+            '.devai/config/project.json',
+            '.devai/config/adopter-policy-binding.json',
+            '.devai/config/authority-policy.json',
+          ],
+        },
+        {
+          id: 'MIG-2.9.0-constitution-1-2-1-documentation-implementation',
+          kind: 'constitution',
+          summary:
+            'Constitution 1.2.1 adds the exact documentation implementation core specialization. A versioned Architect-authored adopter policy may explicitly list finite executable files under docs/ for Engineer implementation authority, excluding protected tests and architectural specifications. Existing unselected docs authority, focused-regression limits, proof-reconciliation/index safeguards and all other declared inputs remain unchanged. Full constitution review and explicit registered binding are required; upgrading does not invent a file list, provision reconciliation, recover proofs, publish artifacts or grant downstream acceptance.',
+          decision_records: ['ADR-AUT-0010'],
+          segments: ['constitution', 'adopter-policy', 'authority'],
+          files: [
+            '.devai/pin/constitution.md',
+            '.devai/config/project.json',
+            '.devai/config/adopter-policy-binding.json',
+            '.devai/config/authority-policy.json',
+          ],
+          decision_required: true,
+          constitution: {
+            from: '1.2.0',
+            to: '1.2.1',
+          },
+          obligation: {
+            check: 'constitution-version',
+            requirement:
+              'Review ADR-AUT-0010 and the complete adopter pin delta to the exact installed Constitution 1.2.1 (SHA-256 4dbb9caa8961cf3bbf8070faf7525711b018b1aaa3b47b17ae9a85f55cf4b57c), then explicitly request init upgrade --constitution (or init bind --constitution). Documentation implementation additionally requires the exact approved finite policy list and registered adopter-policy binding; no list is inferred.',
+          },
+        },
+      ],
+    };
+    expect(CURRENT_MANIFEST).toEqual({ ...MANIFEST, releases: [...manifest.releases, successor] });
+    expect(currentManifest.releases.at(-1)).toEqual(successor);
+    expect(resolveCliVersion()).toBe('2.9.0');
+    expect(plannedReleases(currentManifest, '2.8.0', '2.9.0')).toEqual([successor]);
+    expect(plannedReleases(currentManifest, '2.8.0', '2.8.0')).toEqual([successor]);
+  });
+
   it('validates against its schema with ascending releases and version-scoped change ids', () => {
     expect(manifest.baseline).toBe('1.6.0');
     expect(manifest.segments).toEqual([
@@ -340,7 +400,7 @@ describe('#264: the adopter migration manifest', () => {
   });
 
   it('declares the non-neutral 2.9.0 candidate and exact authority rebind', () => {
-    const next = manifest.releases.find((release) => release.version === '2.9.0');
+    const next = currentManifest.releases.find((release) => release.version === '2.9.0');
     expect(next).toMatchObject({ version: '2.9.0', status: 'unreleased' });
     expect(next?.changes).toEqual([
       expect.objectContaining({
@@ -361,10 +421,15 @@ describe('#264: the adopter migration manifest', () => {
           '.devai/config/authority-policy.json',
         ],
       }),
+      expect.objectContaining({
+        id: 'MIG-2.9.0-constitution-1-2-1-documentation-implementation',
+        kind: 'constitution',
+        decision_records: ['ADR-AUT-0010'],
+      }),
     ]);
-    expect(plannedReleases(manifest, '2.8.1', '2.9.0').map((release) => release.version)).toEqual([
-      '2.9.0',
-    ]);
+    expect(
+      plannedReleases(currentManifest, '2.8.1', '2.9.0').map((release) => release.version),
+    ).toEqual(['2.9.0']);
   });
 
   it('covers the installed package version', () => {
@@ -374,7 +439,7 @@ describe('#264: the adopter migration manifest', () => {
       !CONFIGURATION_NEUTRAL_RELEASES.has(installed) &&
       !CONFIGURATION_NEUTRAL_CANDIDATES.has(installed)
     ) {
-      expect(manifest.releases.map((release) => release.version)).toContain(installed);
+      expect(currentManifest.releases.map((release) => release.version)).toContain(installed);
     }
     // Across a neutral release no released entry is planned and init upgrade only restamps the
     // version.

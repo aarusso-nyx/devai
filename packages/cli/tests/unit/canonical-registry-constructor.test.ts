@@ -1,3 +1,4 @@
+import { resolveCliVersion } from '../../src/version.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -245,8 +246,8 @@ describe('canonical action registry constructor', () => {
 
   it('derives identical policy provenance from repeated constructions', () => {
     const root = process.cwd();
-    const first = buildTrustedAuthoritySources(canonicalRegistry(), root, '1.1.0-rc.1');
-    const second = buildTrustedAuthoritySources(canonicalRegistry(), root, '1.1.0-rc.1');
+    const first = buildTrustedAuthoritySources(canonicalRegistry(), root, resolveCliVersion());
+    const second = buildTrustedAuthoritySources(canonicalRegistry(), root, resolveCliVersion());
     expect(second.provenance).toEqual(first.provenance);
   });
 

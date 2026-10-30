@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseConstitutionVersion } from '@devai-nyx/skills';
+import {
+  frozenReconciliationConstitution,
+  projectReconciliationConstitution,
+} from '../helpers/constitution-history.js';
 
 // ADR-GOV-0026: the constitution advances to 1.1.0 by amending the Article 6 test row and
 // extension paragraph, the Article 7 Inspector and Engineer bullets, and Article 10, and the
@@ -88,7 +92,8 @@ function section(text: string, from: string, to: string): string {
 // Reconstruct only the approved successor delta; historical assertions below still
 // prove ADR-GOV-0026 against its original predecessor and immutable 1.1.0 digest.
 function historicalSource(text = read(SOURCE)): string {
-  let source = text;
+  let source =
+    parseConstitutionVersion(text) === '1.2.1' ? projectReconciliationConstitution(text) : text;
   if (parseConstitutionVersion(source) === '1.2.0') {
     source = source.replace(`\n${SUCCESSOR_INSERTIONS[0]}\n\n`, '');
     source = source.replace(`\n${SUCCESSOR_INSERTIONS[1]}\n`, '');
@@ -108,12 +113,13 @@ const SUCCESSOR_INSERTIONS = [
 ] as const;
 
 describe('constitution 1.1.0 Articles 6, 7 and 10 amendment (ADR-GOV-0026)', () => {
-  it('reconstructs the byte-bound historical source and held or successor pin as identical 1.1.0', () => {
+  it('reconstructs the byte-bound historical source and genuinely adopted successor pin as identical 1.1.0', () => {
     const source = historicalSource();
     const actualPin = read(PIN);
     const version = parseConstitutionVersion(actualPin);
-    expect(['1.1.0', '1.2.0']).toContain(version);
-    if (version === '1.2.0') expect(actualPin).toBe(read(SOURCE));
+    expect(version).toBe('1.2.1');
+    expect(actualPin).toBe(read(SOURCE));
+    expect(projectReconciliationConstitution(actualPin)).toBe(frozenReconciliationConstitution());
     const pin = historicalSource(actualPin);
     expect(parseConstitutionVersion(source)).toBe('1.1.0');
     expect(parseConstitutionVersion(pin)).toBe('1.1.0');
@@ -178,15 +184,16 @@ describe('constitution 1.1.0 Articles 6, 7 and 10 amendment (ADR-GOV-0026)', () 
     expect(sha256(reverted)).toBe(CONSTITUTION_1_0_2_SHA256);
   });
 
-  it('binds the real framework authority policy to the exact held or successor pin', () => {
+  it('binds the real framework authority policy to the exact adopted successor pin', () => {
     const policy = JSON.parse(read('.devai/config/authority-policy.json')) as {
       constitution: { version: string; digest_sha256: string };
     };
     const pin = read(PIN);
     const version = parseConstitutionVersion(pin);
-    expect(['1.1.0', '1.2.0']).toContain(version);
+    expect(version).toBe('1.2.1');
     expect(historicalSource(pin)).toBe(historicalSource());
-    if (version === '1.2.0') expect(pin).toBe(read(SOURCE));
+    expect(pin).toBe(read(SOURCE));
+    expect(projectReconciliationConstitution(pin)).toBe(frozenReconciliationConstitution());
     expect(policy.constitution).toEqual({
       version,
       digest_sha256: sha256(pin),

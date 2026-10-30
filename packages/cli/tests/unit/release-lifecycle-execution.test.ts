@@ -3612,6 +3612,59 @@ describe('release lifecycle execution kernel', () => {
     expect(proxyPrototypeReads).toBe(1);
   });
 
+  it.each([
+    'rpl-package-identity-mismatch',
+    'rpl-policy-resolution-mismatch',
+    'rpl-adopter-binding-mismatch',
+    'rpl-policy-source-unresolved',
+    'SIGNATURE_ALGORITHM_UNSUPPORTED',
+    'release-export-capacity-unavailable',
+    'release-export-capacity-insufficient',
+  ])(
+    'persists a schema-valid export failure while retaining the outward diagnostic %s',
+    async (code) => {
+      const value = request('release export');
+      const store = new ReleaseLifecycleFileStore(root(), value);
+      await advanceToPrepared(store);
+      const headBefore = store.readHead();
+      const provider = vi.fn(() => ({
+        outcome: 'failure' as const,
+        dispatch_status: 'failed-before-dispatch' as const,
+        code,
+      }));
+      const result = await withReleaseExportAuthorityFixture(value, () =>
+        executeReleaseLifecycleAction({
+          request: value,
+          action: 'release export',
+          authority: authorityFor('release export'),
+          store,
+          resolveReceipt: () => planReceipt(),
+          resolvePlanInput,
+          provider,
+          artifactReader: artifactReaderFor('release prepare'),
+          recorded_at: '2026-09-03T00:00:00.000Z',
+        }),
+      );
+      expect(result).toMatchObject({ ok: false, phase: 'provider', code });
+      expect(provider).toHaveBeenCalledOnce();
+      const records = store.readStoreRecords();
+      const terminal = records.at(-1);
+      expect(terminal).toMatchObject({
+        record_kind: 'failure',
+        failure: {
+          code: code.startsWith('release-') ? code : 'release-provider-failed',
+          retryable: false,
+        },
+        provider_dispatch: { status: 'failed-before-dispatch', handle_observed: false },
+      });
+      expect(schemaParsers.releaseLifecycleStoreRecord.safeParse(terminal).ok).toBe(true);
+      expect(reduceStoreRecords(records)).toMatchObject({ ok: true, ambiguous: false });
+      expect(reduceReleaseStates(store.readStateRecords())).toMatchObject({ ok: true });
+      expect(store.readHead()).toEqual(headBefore);
+      expect(store.readStateRecords().at(-1)?.state).toBe('prepared');
+    },
+  );
+
   it('keeps an explicitly managed pre-sign export failure retryable', async () => {
     const value = request('release export');
     const store = new ReleaseLifecycleFileStore(root(), value);

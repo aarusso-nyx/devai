@@ -79,6 +79,23 @@ describe('release export artifact-store provider boundary', () => {
   it('runs the v3 none carrier through the bundled protected host lifecycle', async () => {
     const root = resolve(import.meta.dirname, '../../../..');
     const temporary = mkdtempSync(join(tmpdir(), 'devai export bundle ç-'));
+    writeFileSync(
+      join(temporary, 'package.json'),
+      readFileSync(join(root, 'packages/cli/package.json')),
+    );
+    for (const path of [
+      'constitution.md',
+      'policy/action-registry.json',
+      'policy/domains.json',
+      'policy/thresholds.json',
+      'policy/scorecard-na.json',
+      'policy/glob-guards.json',
+      'policy/adopter-defaults/path-authority-classes.json',
+    ]) {
+      const target = join(temporary, 'dist/law', path);
+      mkdirSync(join(target, '..'), { recursive: true });
+      writeFileSync(target, readFileSync(join(root, 'law', path)));
+    }
     const runtime = join(temporary, 'dist/runtime/index');
     mkdirSync(runtime, { recursive: true });
     const output = join(runtime, `release-export-fixture-${randomUUID()}.mjs`);

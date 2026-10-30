@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -17,7 +18,7 @@ import { dirname, join, resolve } from 'node:path';
 /** A filesystem snapshot, never a claim about an absent caller Git index. */
 export function createSelfContainedRepositoryFixture(
   source: string,
-  options: { readonly paths?: readonly string[] } = {},
+  options: { readonly paths?: readonly string[]; readonly bindCurrentDocumentation?: true } = {},
 ): {
   readonly root: string;
   readonly commit: string;
@@ -26,6 +27,10 @@ export function createSelfContainedRepositoryFixture(
   readonly git: (args: readonly string[]) => string;
   readonly cleanup: () => void;
 } {
+  assert(
+    !(options.bindCurrentDocumentation && options.paths),
+    'Registered current binding requires a complete source fixture',
+  );
   const sourceRoot = realpathSync(source);
   const parent = mkdtempSync(join(tmpdir(), 'devai isolated repository ç-'));
   const root = join(parent, 'repository');
@@ -152,6 +157,51 @@ export function createSelfContainedRepositoryFixture(
         writeFileSync(destination, bytes, { flag: 'wx' });
         chmodSync(destination, stat.mode & 0o111 ? 0o755 : 0o644);
       }
+    }
+    if (options.bindCurrentDocumentation) {
+      // Reissue through the actual registered CLI for this fixture's real Git identity.
+      // Snapshot-only callers and explicit cross-repository negative controls stay unchanged.
+      const packageRoot = join(sourceRoot, 'packages/cli');
+      const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+      assert.equal(manifest.name, '@aarusso-nyx/devai');
+      assert.equal(typeof manifest.bin.devai, 'string');
+      const bin = realpathSync(resolve(packageRoot, manifest.bin.devai));
+      assert(bin.startsWith(realpathSync(packageRoot) + '/'));
+      const bound = spawnSync(
+        process.execPath,
+        [
+          bin,
+          'init',
+          'bind',
+          '--adopter-policy',
+          'law/policy/devai-adoption.json',
+          '--target',
+          root,
+          '--as-role',
+          'architect',
+          '--write',
+          '--format',
+          'json',
+        ],
+        {
+          cwd: root,
+          env: environment,
+          encoding: 'utf8',
+          timeout: 30000,
+          maxBuffer: 16 * 1024 * 1024,
+        },
+      );
+      assert.equal(bound.error, undefined);
+      assert.equal(bound.status, 0, bound.stdout + bound.stderr);
+      const envelope = JSON.parse(bound.stdout);
+      assert.equal(envelope.schemaVersion, '1.0.0');
+      assert.equal(envelope.action_id, 'init bind');
+      assert.equal(envelope.ok, true);
+      assert.equal(envelope.result.verdict, 'pass');
+      const receipt = JSON.parse(
+        readFileSync(join(root, '.devai/config/adopter-policy-binding.json'), 'utf8'),
+      );
+      assert.equal(receipt.documentation_implementation.repository_id, 'repository');
     }
     // The population was selected above; force-add retains explicitly requested
     // real controls even when an adopter ignore rule would otherwise omit them.

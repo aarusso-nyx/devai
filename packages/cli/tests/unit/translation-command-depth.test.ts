@@ -35,7 +35,7 @@ function writeJson(path: string, value: unknown): void {
 }
 
 beforeAll(() => {
-  fixture = createSelfContainedRepositoryFixture(ROOT);
+  fixture = createSelfContainedRepositoryFixture(ROOT, { bindCurrentDocumentation: true });
   repository = fixture.root;
   const candidate = fixture.commit;
   witness = {

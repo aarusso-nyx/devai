@@ -289,10 +289,10 @@ describe('ADR-AUT-0003 fixture binding under the ADR-AUT-0004 class verbs', () =
       deny('AUTHORITY_ACTION_DENIED'),
     );
   });
-  it('pins constitution 1.2.0 and binds the reference source', () => {
+  it('pins constitution 1.2.1 and binds the reference source', () => {
     expect(
       parseConstitutionVersion(readFileSync(join(repo, '.devai/pin/constitution.md'), 'utf8')),
-    ).toBe('1.2.0');
+    ).toBe('1.2.1');
     expect(readFileSync(join(repo, '.devai/pin/constitution.md'))).toEqual(
       readFileSync(resolve(import.meta.dirname, '../../../../law/constitution.md')),
     );

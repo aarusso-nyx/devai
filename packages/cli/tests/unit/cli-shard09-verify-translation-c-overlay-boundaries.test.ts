@@ -196,7 +196,7 @@ function finishScenarioWithNonTestOverlayPath(message: string): void {
 }
 
 beforeAll(() => {
-  fixture = createSelfContainedRepositoryFixture(ROOT);
+  fixture = createSelfContainedRepositoryFixture(ROOT, { bindCurrentDocumentation: true });
   repository = fixture.root;
   writeJson('law/invariants/INV-DEMO-010.json', {
     schemaVersion: '1.0.0',
