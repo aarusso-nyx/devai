@@ -37,6 +37,10 @@ import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  COMPILED_AUTHORITY_POLICY,
+  documentationCommitJudge,
+} from './commit-documentation-authority.mjs';
 
 export const GRAMMAR_PATH = 'law/policy/commit-grammar.json';
 const TAXONOMY_PATHS = ['law/policy/change-taxonomy.json', '.devai/config/change-taxonomy.json'];
@@ -659,11 +663,14 @@ export function admittedAuthors(
   binding,
   focused = undefined,
   registryGenerated = undefined,
+  documentation = undefined,
 ) {
   const only = (...roles) => new Set(roles);
   if (path === 'scratch/README.md') return only('Architect');
   if (PLACEHOLDERS.has(path)) return only('Engineer');
   if (NEVER_COMMITTED.some((prefix) => path.startsWith(prefix))) return only();
+  if (path === COMPILED_AUTHORITY_POLICY)
+    return documentation?.policyAuthors(commitPaths) ?? only();
   const sources = canonicalSources(path, binding);
   if (sources !== undefined) {
     // Machine always; the Architect only in the commit that changes this output's own source.
@@ -676,7 +683,7 @@ export function admittedAuthors(
   if (path.startsWith('law/glossary/')) return only('Architect', 'Owner');
   if (path.startsWith('law/')) return only('Architect');
   if (path.startsWith('product/')) return only('Owner');
-  if (path.startsWith('docs/')) return only('Architect');
+  if (path.startsWith('docs/')) return documentation?.authorsFor(path) ?? only('Architect');
   if (ROOT_PROSE.has(path)) return only('Architect');
   if (TEST_CLASS.test(path)) {
     return focused?.(path) === true ? only('Inspector', 'Engineer') : only('Inspector');
@@ -704,8 +711,16 @@ export function provenanceFindings({
   binding,
   focused,
   registryGenerated,
+  documentation,
 }) {
   const findings = [];
+  try {
+    documentation?.verifyCurrent();
+  } catch (error) {
+    findings.push(
+      `path ${COMPILED_AUTHORITY_POLICY} documentation authority refused: ${error instanceof Error ? error.message : 'verification failed'}`,
+    );
+  }
   if (parents > 1) {
     findings.push(
       `merge commit with ${String(parents)} parents: a pull-request range admits no merge commit (ADR-CHK-0008)`,
@@ -724,7 +739,15 @@ export function provenanceFindings({
       );
     }
     for (const path of paths) {
-      const admitted = admittedAuthors(path, paths, binding, focused, registryGenerated);
+      let admitted;
+      try {
+        admitted = admittedAuthors(path, paths, binding, focused, registryGenerated, documentation);
+      } catch (error) {
+        findings.push(
+          `path ${path} documentation authority refused: ${error instanceof Error ? error.message : 'verification failed'}`,
+        );
+        continue;
+      }
       if (admitted.size === 0) {
         findings.push(`path ${path} is not admitted for any author by the ADR-CHK-0008 table`);
       } else if (!admitted.has(role)) {
@@ -776,15 +799,29 @@ function checkRange(root, base, head) {
       .replace(/\n$/u, '')
       .split('\0');
     const changes = parentCount > 1 ? new Map() : commitChanges(root, sha);
-    const provenance = provenanceFindings({
-      binding,
-      parents: parentCount,
-      author: { name: authorName, email: authorEmail },
-      committer: { name: committerName, email: committerEmail },
-      paths: [...changes.keys()],
-      focused: focusedRegressionJudge(root, sha, changes),
-      registryGenerated: registryGeneratedJudge(root, base, sha, changes),
-    });
+    const documentation = documentationCommitJudge(root, sha);
+    let provenance;
+    try {
+      provenance = provenanceFindings({
+        binding,
+        parents: parentCount,
+        author: { name: authorName, email: authorEmail },
+        committer: { name: committerName, email: committerEmail },
+        paths: [...changes.keys()],
+        focused: focusedRegressionJudge(root, sha, changes),
+        registryGenerated: registryGeneratedJudge(root, base, sha, changes),
+        documentation,
+      });
+    } finally {
+      try {
+        documentation.dispose();
+      } catch (error) {
+        provenance ??= [];
+        provenance.push(
+          `documentation snapshot custody refused: ${error instanceof Error ? error.message : 'verification failed'}`,
+        );
+      }
+    }
     if (parentCount > 1) {
       offenders.push({
         sha,
