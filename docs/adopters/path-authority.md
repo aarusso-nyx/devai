@@ -199,7 +199,7 @@ target, not evidence that the public task-start lifecycle fails: that command pr
 resources and has no arbitrary source-file target or content input. The source Engineer action
 does not implement the later constitution's separate focused-regression exception. No new
 `check` grant or blanket Engineer test permission is introduced. See
-[ADR-AUT-0010](../../law/adr/ADR-AUT-0010-exact-source-file-application.md) for the exact scope
+[ADR-AUT-0010](../../law/adr/ADR-AUT-0009-exact-source-file-application.md) for the exact scope
 and outstanding qualification obligations.
 
 The new verbs change registry-derived class sets and policy digests. After adopting a qualified
