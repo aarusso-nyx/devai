@@ -347,18 +347,20 @@ describe('complete native integrity and unchanged canonical reconstruction', () 
       const after = current.buildTrustedAuthoritySources(entries, root, version);
       // Project only the independently accepted source-action delta onto the frozen
       // full historical result. Every other rule, order, byte and digest stays exact.
-      const sourceRows = [
+      const sourceRows = (
         [
-          'core-inspector-source-tests',
-          'tests/**',
-          'Article 6 Inspector source application in the core tests root.',
-        ],
-        [
-          'core-inspector-source-package-tests',
-          'packages/*/tests/**',
-          'Article 6 Inspector source application in package test roots.',
-        ],
-      ].map(([id, path, rationale]) =>
+          [
+            'core-inspector-source-tests',
+            'tests/**',
+            'Article 6 Inspector source application in the core tests root.',
+          ],
+          [
+            'core-inspector-source-package-tests',
+            'packages/*/tests/**',
+            'Article 6 Inspector source application in package test roots.',
+          ],
+        ] as const
+      ).map(([id, path, rationale]) =>
         mainSupport.rule({
           id,
           origin: 'immutable-core',
@@ -386,9 +388,10 @@ describe('complete native integrity and unchanged canonical reconstruction', () 
                 ? actions.filter((id) => id !== 'source apply inspector')
                 : actions;
           const result = { ...row, action_ids };
+          const existing = action_ids.length === 0 ? [] : [result];
           return insert && row['rule_id'] === 'core-inspector-tests'
-            ? [result, ...sourceRows]
-            : [result];
+            ? [...existing, ...sourceRows]
+            : existing;
         });
       }
       const integratedCoreRules = sourceDelta(expected.immutableCore.rules, true);
@@ -446,6 +449,12 @@ describe('complete native integrity and unchanged canonical reconstruction', () 
           resolved_rule_bytes: baseline.canonicalBytes(integratedRules),
         },
       };
+      expect(after.immutableCore.rules).toEqual(integratedCoreRules);
+      expect(after.additiveExtensions.map((extension) => extension.rules)).toEqual(
+        integratedExtensions.map((extension) => extension.rules),
+      );
+      expect(after.rules).toEqual(integratedRules);
+      expect(after.provenance).toEqual(integratedProvenance);
       expect(after).toEqual(integrated);
       expect([...current.canonicalBytes(after)]).toEqual([...baseline.canonicalBytes(integrated)]);
       expect(after.additiveExtensions.length).toBe(mode === 'documentation-and-adopter' ? 2 : 1);
