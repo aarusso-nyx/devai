@@ -540,7 +540,7 @@ const REPOSITORY_WORKFLOW_STEPS: readonly ReviewedWorkflowStep[] = [
       },
       {
         path: 'packages/authority/src/runtime/documentation-context.ts',
-        sha256: 'db5329dee142eb4d03352f772123902a1eef9d5dd9dfb82cd77cf8dc57fadc50',
+        sha256: 'a80f885d5258aa04f8bcf6e395310147174ac72775321c1a27edb5b3970f40bd',
       },
       {
         path: 'packages/authority/src/runtime/effect-authorization-ledger.ts',
