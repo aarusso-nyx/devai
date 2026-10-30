@@ -99,7 +99,7 @@ async function bind(root: string) {
   ]);
   expect(result.exit, `${result.stdout}\n${result.stderr}`).toBe(0);
 }
-async function fixture() {
+async function fixture(policyFields: Record<string, unknown> = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'devai-docs-native-')));
   roots.push(root);
   execFileSync('git', ['init', '-q'], { cwd: root });
@@ -118,7 +118,7 @@ async function fixture() {
   expect(result.exit, `${result.stdout}\n${result.stderr}`).toBe(0);
   for (const path of files) put(root, path, 'export {};\n');
   put(root, 'docs/site/sidebars.js', 'export {};\n');
-  put(root, SOURCE, source());
+  put(root, SOURCE, JSON.stringify({ ...JSON.parse(source()), ...policyFields }));
   await bind(root);
   return root;
 }
@@ -631,6 +631,98 @@ describe('complete native integrity and unchanged canonical reconstruction', () 
       );
     });
   }
+});
+
+describe('complete materialized target set before native context issuance', () => {
+  it.each([
+    'project.json',
+    'domains.json',
+    'thresholds.json',
+    'scorecard-na.json',
+    'glob-guards.json',
+  ])(
+    'refuses omission of required materialized target %s even with unchanged files',
+    async (file) => {
+      const root = await fixture();
+      const a = await apis();
+      expect(a.native.loadBoundDocumentationImplementation(root)).toBeDefined();
+      const receipt = parsed(root, RECEIPT);
+      record(receipt.materialized);
+      Reflect.deleteProperty(receipt.materialized, `.devai/config/${file}`);
+      put(root, RECEIPT, JSON.stringify(receipt));
+      expect(() => a.native.loadBoundDocumentationImplementation(root)).toThrow(
+        'DOCUMENTATION_IMPLEMENTATION_CONTEXT_BINDING_MISMATCH',
+      );
+      expect(() => a.cli.loadDocumentationImplementationContext(root)).toThrow();
+    },
+  );
+  const optional = [
+    ['release_verification', 'release-verification.json', '../release-verification.json'],
+    ['sensor_inputs', 'sensor-inputs.json', 'sensor-inputs.json'],
+    ['invariant_producers', 'invariant-producers.json', 'invariant-producers.json'],
+    ['reviewed_workflow_steps', 'reviewed-workflow-steps.json', 'reviewed-workflow-steps.json'],
+  ] as const;
+  for (const [key, file, canonical] of optional) {
+    it(`refuses omission of source-selected materialized target ${file}`, async () => {
+      const value: unknown = JSON.parse(
+        readFileSync(
+          join(import.meta.dirname, '../../../../law/policy/adopter-defaults', canonical),
+          'utf8',
+        ),
+      );
+      const root = await fixture({ [key]: value });
+      const a = await apis();
+      expect(a.native.loadBoundDocumentationImplementation(root)).toBeDefined();
+      const receipt = parsed(root, RECEIPT);
+      record(receipt.materialized);
+      expect(Object.hasOwn(receipt.materialized, `.devai/config/${file}`)).toBe(true);
+      Reflect.deleteProperty(receipt.materialized, `.devai/config/${file}`);
+      put(root, RECEIPT, JSON.stringify(receipt));
+      expect(() => a.native.loadBoundDocumentationImplementation(root)).toThrow(
+        'DOCUMENTATION_IMPLEMENTATION_CONTEXT_BINDING_MISMATCH',
+      );
+    });
+  }
+  it.each(['present', 'missing', 'drifted'])(
+    'refuses a project-only receipt when omitted configuration is %s',
+    async (state) => {
+      const root = await fixture();
+      const a = await apis();
+      const receipt = parsed(root, RECEIPT);
+      record(receipt.materialized);
+      receipt.materialized = {
+        '.devai/config/project.json': receipt.materialized['.devai/config/project.json'],
+      };
+      put(root, RECEIPT, JSON.stringify(receipt));
+      if (state === 'missing') rmSync(join(root, '.devai/config/thresholds.json'));
+      if (state === 'drifted') put(root, '.devai/config/thresholds.json', '{}');
+      expect(() => a.native.loadBoundDocumentationImplementation(root)).toThrow(
+        'DOCUMENTATION_IMPLEMENTATION_CONTEXT_BINDING_MISMATCH',
+      );
+    },
+  );
+  it('preserves a genuine prior-owned optional materialized target after override retirement', async () => {
+    const value: unknown = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, '../../../../law/policy/adopter-defaults/sensor-inputs.json'),
+        'utf8',
+      ),
+    );
+    const root = await fixture({ sensor_inputs: value });
+    put(root, SOURCE, source());
+    await bind(root);
+    const receipt = parsed(root, RECEIPT);
+    record(receipt.materialized);
+    expect(Object.hasOwn(receipt.materialized, '.devai/config/sensor-inputs.json')).toBe(true);
+    const a = await apis();
+    expect(a.native.loadBoundDocumentationImplementation(root)).toBeDefined();
+  });
+  it('refuses drift with a complete unchanged materialized receipt', async () => {
+    const root = await fixture();
+    const a = await apis();
+    put(root, '.devai/config/thresholds.json', '{}');
+    expect(() => a.native.loadBoundDocumentationImplementation(root)).toThrow();
+  });
 });
 
 describe('selected path ordinary host enforcement', () => {
