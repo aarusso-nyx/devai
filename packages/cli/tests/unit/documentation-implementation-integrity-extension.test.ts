@@ -822,33 +822,36 @@ describe('selected path ordinary host enforcement', () => {
       h.dispose();
     }
   });
-  it('refuses protected overlap rebind without replacing prior complete policy and receipt', async () => {
-    const root = await fixture();
-    const original = { policy: text(root, POLICY), receipt: text(root, RECEIPT) };
-    const value = parsed(root, SOURCE);
-    value.documentation_implementation = { files: [...files, 'docs/probe.spec.ts'] };
-    put(root, 'docs/probe.spec.ts', 'export {};\n');
-    put(root, SOURCE, JSON.stringify(value));
-    const result = await runCli([
-      'init',
-      'bind',
-      '--adopter-policy',
-      SOURCE,
-      '--target',
-      root,
-      '--as-role',
-      'architect',
-      '--write',
-    ]);
-    expect(result.exit).not.toBe(0);
-    expect({ policy: text(root, POLICY), receipt: text(root, RECEIPT) }).toEqual(original);
-    const a = await apis();
-    expect(() => a.native.loadBoundDocumentationImplementation(root)).toThrow();
-    put(root, SOURCE, source());
-    await bind(root);
-    const fresh = await apis();
-    expect(fresh.native.loadBoundDocumentationImplementation(root)).toBeDefined();
-  });
+  it.each(['docs/probe.spec.ts', 'docs/site/login.e2e.ts', 'docs/site/login.wiring-spec.ts'])(
+    'refuses protected overlap rebind %s without replacing prior complete policy and receipt',
+    async (path) => {
+      const root = await fixture();
+      const original = { policy: text(root, POLICY), receipt: text(root, RECEIPT) };
+      const value = parsed(root, SOURCE);
+      value.documentation_implementation = { files: [...files, path] };
+      put(root, path, 'export {};\n');
+      put(root, SOURCE, JSON.stringify(value));
+      const result = await runCli([
+        'init',
+        'bind',
+        '--adopter-policy',
+        SOURCE,
+        '--target',
+        root,
+        '--as-role',
+        'architect',
+        '--write',
+      ]);
+      expect(result.exit).not.toBe(0);
+      expect({ policy: text(root, POLICY), receipt: text(root, RECEIPT) }).toEqual(original);
+      const a = await apis();
+      expect(() => a.native.loadBoundDocumentationImplementation(root)).toThrow();
+      put(root, SOURCE, source());
+      await bind(root);
+      const fresh = await apis();
+      expect(fresh.native.loadBoundDocumentationImplementation(root)).toBeDefined();
+    },
+  );
 });
 
 // Current-main prospective review is a projection, never a pending write grant.

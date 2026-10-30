@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { documentationProtectedClass } from '@devai-nyx/authority';
+import { isExecutableTestFile } from '@devai-nyx/utils';
 import { compileDocumentationImplementationRules } from '../../src/authority/policy-documentation-implementation.js';
 import { classWriteVerbs } from '../../src/authority/policy-support.js';
 import { canonicalRegistry } from '../../src/define-command.js';
@@ -121,6 +122,25 @@ describe('exact documentation compiler', () => {
   ])('refuses protected or noncanonical selection %s', (path) => {
     expect(() => compile({ files: [path] })).toThrow('DOCUMENTATION_IMPLEMENTATION_INVALID');
   });
+  it.each(
+    ['test', 'spec', 'e2e', 'wiring-spec'].flatMap((kind) =>
+      ['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs'].map(
+        (extension) => `docs/site/login.${kind}.${extension}`,
+      ),
+    ),
+  )('refuses every shared executable-test filename %s', (path) => {
+    expect(isExecutableTestFile(path)).toBe(true);
+    expect(documentationProtectedClass(path)).toBe('test');
+    expect(() => compile({ files: [path] })).toThrow('DOCUMENTATION_IMPLEMENTATION_INVALID');
+  });
+  it.each(['docs/site/login.test.mts', 'docs/site/login.spec.cts'])(
+    'preserves existing protected module-suffix classification %s',
+    (path) => {
+      expect(documentationProtectedClass(path)).toBe('test');
+      expect(() => compile({ files: [path] })).toThrow('DOCUMENTATION_IMPLEMENTATION_INVALID');
+    },
+  );
+
   it('keeps protected test classification separate from legacy default-role agreement', () => {
     for (const path of [
       'docs/test/probe.ts',
