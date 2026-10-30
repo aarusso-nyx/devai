@@ -35,6 +35,17 @@ package and provenance; this candidate does not rotate that trust pin.
 Candidate verification, signed RC, publication and adopter execution remain
 separate. This candidate changes no downstream acceptance decision.
 
+- Declare a finite list of executable implementation files under docs/ in a
+  versioned adopter policy and bind it through the registered initialization path.
+- Grant Engineer implementation access only to those exact approved files; retain
+  Architect documentation and specification authority and existing test safeguards.
+- Refuse stale, missing, altered, foreign or incompatible specialization bindings
+  consistently across authority consumers, including rename endpoints.
+- Preserve the published 2.8.0 reconciliation safeguards and the trusted verifier
+  package `@aarusso-nyx/devai@2.4.0`. This release adds no automatic adopter list,
+  proof recovery, reconciliation-host provisioning or downstream operational
+  authorization.
+
 ## 2.8.1 — candidate
 
 This patch candidate preserves validated Git resolve-undo (REUC) extension bytes
