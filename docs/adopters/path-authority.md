@@ -199,7 +199,7 @@ target, not evidence that the public task-start lifecycle fails: that command pr
 resources and has no arbitrary source-file target or content input. The source Engineer action
 does not implement the later constitution's separate focused-regression exception. No new
 `check` grant or blanket Engineer test permission is introduced. See
-[ADR-AUT-0009](../../law/adr/ADR-AUT-0009-exact-source-file-application.md) for the exact scope
+[ADR-AUT-0010](../../law/adr/ADR-AUT-0010-exact-source-file-application.md) for the exact scope
 and outstanding qualification obligations.
 
 The new verbs change registry-derived class sets and policy digests. After adopting a qualified
@@ -371,3 +371,27 @@ and receipt untouched. The codes are listed in the
 | `ADOPTER_AUTHORITY_ARCHITECTURE_SELECTORS_REQUIRED` | The architecture class is declared without selectors.                                               |
 | `ADOPTER_AUTHORITY_EXTENSION_ID_RESERVED`           | `extension_id` equals `devai-adopter-authority`.                                                    |
 | `ADOPTER_AUTHORITY_SOURCE_UNAVAILABLE`              | The receipt names a source that is missing or invalid at a governed write or in `doctor`.           |
+
+## Exact documentation implementation specialization
+
+[ADR-AUT-0010](../../law/adr/ADR-AUT-0010-exact-documentation-implementation.md)
+describes the bounded core specialization for exact executable implementation
+files under `docs/`. Accepted law alone does not activate an adopter. The actual
+supported package, exact constitution identity, reviewed policy list and complete
+registered binding must agree before any selected write is admitted. Older pins
+and the historical proposed 1.1.1 candidate are not supported identities.
+
+The closed `documentation_implementation` source has a nonempty unique `files`
+list of exact canonical executable paths. Directories, globs, human documentation,
+architectural specifications, schemas and tests are excluded. Unlisted docs stay
+Architect-owned; selected implementation files receive only Engineer authority.
+
+Registered binding validates source, constitution, package, compiled rules and
+receipt provenance. Missing or stale context refuses the grant. There is no
+environment switch or adopter-local bypass. The five motivating STYNX files
+are listed in the ADR; no upstream change installs that list or updates its pin.
+
+Qualification and release of the actual package, then explicit adopter policy
+and full constitution review and registered binding, remain separate. In
+particular STYNX's 1.0.2-to-new-pin review must include inherited focused-regression
+and proof-chain/index reconciliation authority, not merely the docs file list.
