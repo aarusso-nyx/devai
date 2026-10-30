@@ -97,6 +97,17 @@ describe('complete offline documentation authority policy verification', () => {
   it('accepts an unchanged genuine registered binding and its complete default rules', () => {
     expect(verify(original).release_verification).toEqual(profile);
   });
+  it('refuses a project-only materialized receipt despite unchanged candidate files', () => {
+    const files = new Map(original);
+    const receipt = parsed(files.get(BINDING) ?? assert.fail('binding absent'));
+    object(receipt.materialized);
+    receipt.materialized = {
+      '.devai/config/project.json': receipt.materialized['.devai/config/project.json'],
+    };
+    files.set(BINDING, Buffer.from(JSON.stringify(receipt)));
+    expect(() => verify(files)).toThrow('rpl-adopter-binding-mismatch');
+    expect(verify(original).release_verification).toEqual(profile);
+  });
   it('refuses a pending registered binding journal without changing policy or receipt bytes', () => {
     const files = new Map(original);
     files.set('.devai/config/adopter-policy-binding.journal.json', Buffer.from('{}'));
