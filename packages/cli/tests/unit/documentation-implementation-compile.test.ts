@@ -39,12 +39,12 @@ describe('exact documentation compiler', () => {
     expect(result.files).toEqual(files);
     expect(result.rules).toHaveLength(5);
     expect(new Set(result.rules.map((r) => r.rule_id)).size).toBe(5);
-    expect(classWriteVerbs(entries).root).toEqual(['task start']);
+    expect(classWriteVerbs(entries).root).toEqual(['source apply engineer', 'task start']);
     for (const [index, rule] of result.rules.entries()) {
       expect(rule).toMatchObject({
         origin: 'immutable-core',
         precedence: 700,
-        action_ids: ['task start'],
+        action_ids: ['source apply engineer', 'task start'],
         effect: 'allow',
         selector: {
           kind: 'fs',

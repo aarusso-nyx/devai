@@ -483,7 +483,7 @@ describe('translation validation E state and frame boundaries', () => {
     );
   });
 
-  it('requires both worktree and database cleanup before retiring the current lease', async () => {
+  it('retires the lease only after worktree and database cleanup succeed', async () => {
     const clean = await validate();
     const cleanLease = (clean['cleanup'] as { lease_id: string }).lease_id;
     expect(frame(clean, 'cleanup')).toEqual({
@@ -496,8 +496,9 @@ describe('translation validation E state and frame boundaries', () => {
         resolve(repository, `.devai/state/translation-validation/leases/${cleanLease}.json`),
       ),
     ).toBe(false);
+  });
 
-    controls.evaluations = [];
+  it('retains the lease when database cleanup fails', async () => {
     controls.dropOk = false;
     const databaseOrphan = await validate();
     const databaseLease = (databaseOrphan['cleanup'] as { lease_id: string }).lease_id;
@@ -522,9 +523,9 @@ describe('translation validation E state and frame boundaries', () => {
       resolve(repository, `.devai/state/translation-validation/leases/${databaseLease}.json`),
       { force: true },
     );
+  });
 
-    controls.evaluations = [];
-    controls.dropOk = true;
+  it('retains the lease when worktree cleanup fails', async () => {
     controls.removeFailures = 2;
     const worktreeOrphan = await validate();
     const worktreeLease = (worktreeOrphan['cleanup'] as { lease_id: string }).lease_id;

@@ -616,7 +616,11 @@ describe('#264 review: durability, decisions, exclusion and the measured receipt
       from: '2.8.0',
       to: '2.9.0',
       constitution: { from: '1.2.0', to: '1.2.1' },
-      migrations: ['MIG-2.9.0-constitution-1-2-1-documentation-implementation'],
+      migrations: [
+        'MIG-2.9.0-role-bound-source-actions',
+        'MIG-2.9.0-source-authority-rebind',
+        'MIG-2.9.0-constitution-1-2-1-documentation-implementation',
+      ],
     });
     const settled = snapshot(repo);
     expect((await runCli(WRITE(repo))).exit).toBe(0);
