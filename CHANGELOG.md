@@ -60,6 +60,9 @@ package and provenance; this candidate does not rotate that trust pin.
   preserving Darwin-only admission, supported Node/libuv, every native assertion,
   and the required zero-skip CI report.
 
+- Handle concurrent append-lock release during authority snapshots; retain stale-head
+  recovery guards and distinguish dangling symlinks from absent entries.
+
 Candidate verification, signed RC, publication and adopter execution remain
 separate. This candidate changes no downstream acceptance decision.
 
