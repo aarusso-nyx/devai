@@ -255,8 +255,10 @@ export function fsTarget(
 
 export function snapshot(root: string, relativePath: string): unknown {
   const path = physicalCanonicalPath(root, relativePath);
-  if (!existsSync(path)) return undefined;
-  const stat = lstatSync(path);
+  // An owner may release its append lock between existence and stat probes.
+  // Observe the entry once; preserve non-ENOENT errors and dangling symlinks.
+  const stat = lstatSync(path, { throwIfNoEntry: false });
+  if (stat === undefined) return undefined;
   return {
     kind: stat.isSymbolicLink() ? 'symlink' : stat.isDirectory() ? 'directory' : 'file',
     mode: stat.mode,
