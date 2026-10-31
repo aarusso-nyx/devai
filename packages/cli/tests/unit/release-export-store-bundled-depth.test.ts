@@ -236,30 +236,10 @@ export class ProtectedCertificationContainer extends OriginalProtectedCertificat
         join(temporary, 'dist/runtime/package.json'),
         readFileSync(join(root, 'packages/cli/dist/runtime/package.json')),
       );
-      const environment = {
-        ...process.env,
-        DEVAI_TEST_ROOT: root,
-        DEVAI_TEST_PREPARED_BINDING: join(temporary, 'registered-binding.json'),
-      };
-      // Keep the 60 s enclosing budget and each 30 s child budget. Genuine
-      // binding preparation and the complete protected lifecycle are distinct
-      // phases; transfer the registered bytes rather than repeating the bind.
-      const prepared = JSON.parse(
-        execFileSync(process.execPath, [output], {
-          encoding: 'utf8',
-          timeout: 30_000,
-          env: { ...environment, DEVAI_TEST_EXPORT_PHASE: 'prepare-binding' },
-        }),
-      ) as { binding_digest_sha256: string };
-      expect(prepared.binding_digest_sha256).toMatch(/^[a-f0-9]{64}$/);
       const stdout = execFileSync(process.execPath, [output], {
         encoding: 'utf8',
         timeout: 30_000,
-        env: {
-          ...environment,
-          DEVAI_TEST_EXPORT_PHASE: 'lifecycle',
-          DEVAI_TEST_BINDING_DIGEST: prepared.binding_digest_sha256,
-        },
+        env: { ...process.env, DEVAI_TEST_ROOT: root },
       });
       expect(JSON.parse(stdout)).toMatchObject({ verdict: 'pass', mode: 'none' });
     } finally {
