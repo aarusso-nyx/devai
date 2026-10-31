@@ -225,6 +225,45 @@ describe('round run judges a routine diff by Article 6 (ruling (b))', () => {
     expect(result).toMatchObject({ ok: true });
   });
 
+  it.each([
+    ['scratch', true],
+    ['.devai/state', true],
+    ['.devai/worktrees', true],
+    ['.devai/local', true],
+    ['docs/vendor-new', false],
+  ] as const)('classifies a new embedded repository at %s', async (path, permitted) => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask([
+        process.execPath,
+        '-e',
+        [
+          "const fs = require('node:fs');",
+          `const destination = ${JSON.stringify(path)};`,
+          'fs.mkdirSync(destination, { recursive: true });',
+          "fs.writeFileSync(destination + '/README.md', 'nested repository');",
+          "const run = (...args) => require('node:child_process').execFileSync('git', ['-C', destination, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', ...args], { stdio: 'ignore' });",
+          "run('init', '-q'); run('add', 'README.md'); run('commit', '-qm', 'nested');",
+        ].join('\n'),
+      ]),
+    );
+    git(join(root, path), 'rev-parse', '--verify', 'HEAD');
+    expect(readFileSync(join(root, path, 'README.md'), 'utf8')).toBe('nested repository');
+    expect(result).toMatchObject(
+      permitted ? { ok: true } : { ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' },
+    );
+  });
+
+  it('does not exempt a regular file named scratch', async () => {
+    const root = repository();
+    const result = await dispatch(
+      root,
+      routineTask(editing({ scratch: 'not a runtime directory\n' })),
+    );
+    expect(result).toMatchObject({ ok: false, code: 'TASK_WRITE_SCOPE_VIOLATION' });
+  });
+
   it('keeps a routine that changed nothing passing', async () => {
     const root = repository();
     const result = await dispatch(root, routineTask([process.execPath, '-e', 'process.exit(0)']));
