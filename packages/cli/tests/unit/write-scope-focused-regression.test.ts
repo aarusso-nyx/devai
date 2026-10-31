@@ -115,7 +115,7 @@ const CHANGED_A = { 'packages/x/src/a.ts': 'export const a = 2;\n' };
 const regression = (specifier: string) =>
   [
     "import { expect, it } from 'vitest';",
-    `import { a } from '${specifier}';`,
+    `import { a } from ${JSON.stringify(specifier)};`,
     '',
     "it('is two', () => expect(a).toBe(2));",
     '',
@@ -185,6 +185,26 @@ describe('IA-001: an Engineer test adjacent to the task change is admitted', () 
       'packages/x/tests/unit/a-wildcard.test.ts': regression('@fixture/x/dist/a'),
     });
     expect(verdict.outOfScope).toEqual([]);
+  });
+
+  it.each(['cost$$', 'cost$&', 'cost$`', "cost$'"])(
+    'admits a literal wildcard replacement capture %s',
+    async (capture) => {
+      const verdict = await judge({
+        [`packages/x/src/${capture}/a.ts`]: 'export const a = 2;\n',
+        'packages/x/tests/unit/literal-capture.test.ts': regression(`@fixture/x/dist/${capture}/a`),
+      });
+      expect(verdict.outOfScope).toEqual([]);
+    },
+  );
+
+  it('refuses a wildcard import whose replacement tokens name a different source', async () => {
+    const test = 'packages/x/tests/unit/wrong-literal-capture.test.ts';
+    const verdict = await judge({
+      'packages/x/src/cost$/a.ts': 'export const a = 2;\n',
+      [test]: regression('@fixture/x/dist/cost$$/a'),
+    });
+    expect(verdict.outOfScope).toEqual([test]);
   });
 
   it('refuses a test whose wildcard export import names only an unchanged source', async () => {

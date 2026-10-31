@@ -171,7 +171,7 @@ const CHANGED_A = { 'packages/x/src/a.ts': 'export const a = 2;\n' };
 const testImporting = (specifier: string, title = 'covers the change') =>
   [
     "import { expect, it } from 'vitest';",
-    `import * as subject from '${specifier}';`,
+    `import * as subject from ${JSON.stringify(specifier)};`,
     '',
     `it('${title}', () => expect(subject).toBeDefined());`,
     '',
@@ -240,6 +240,37 @@ describe('ADR-CHK-0009 IA-001: an Engineer commit holding a source and its adjac
       files: {
         ...CHANGED_A,
         'packages/x/tests/unit/a-wildcard.test.ts': testImporting('@fixture/x/dist/a'),
+      },
+    });
+  });
+});
+
+describe('wildcard replacement captures retain literal filename bytes', () => {
+  it.each(['cost$$', 'cost$&', 'cost$`', "cost$'"])(
+    'admits a literal wildcard replacement capture %s',
+    (capture) => {
+      expectAdmitted({
+        author: ENGINEER,
+        message: 'fix(x): cover a literal wildcard export',
+        files: {
+          [`packages/x/src/${capture}/a.ts`]: 'export const a = 2;\n',
+          'packages/x/tests/unit/literal-capture.test.ts': testImporting(
+            `@fixture/x/dist/${capture}/a`,
+          ),
+        },
+      });
+    },
+  );
+
+  it('refuses a wildcard import whose replacement tokens name a different source', () => {
+    expectRefused({
+      author: ENGINEER,
+      message: 'fix(x): add a test importing a different literal source',
+      files: {
+        'packages/x/src/cost$/a.ts': 'export const a = 2;\n',
+        'packages/x/tests/unit/wrong-literal-capture.test.ts': testImporting(
+          '@fixture/x/dist/cost$$/a',
+        ),
       },
     });
   });
