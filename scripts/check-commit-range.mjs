@@ -501,7 +501,9 @@ function exportTargets(manifest, subpath) {
         : ENTRY_CONDITIONS.flatMap((condition) =>
             typeof entry[condition] === 'string' ? [entry[condition]] : [],
           );
-  return match === undefined ? targets : targets.map((target) => target.replaceAll('*', match));
+  return match === undefined
+    ? targets
+    : targets.map((target) => target.replaceAll('*', () => match));
 }
 
 /**
