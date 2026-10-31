@@ -277,6 +277,22 @@ describe('wildcard replacement captures retain literal filename bytes', () => {
 });
 
 describe('ADR-CHK-0009 IA-002: an Engineer test that imports nothing the commit changed is refused', () => {
+  it.each(['cost?query', 'cost#fragment', 'cost\\path'])(
+    'refuses a URL-special wildcard capture %s despite a changed literal file',
+    (capture) => {
+      expectRefused({
+        author: ENGINEER,
+        message: 'fix(x): change a literal URL-special path with a regression test',
+        files: {
+          [`packages/x/src/${capture}/a.ts`]: 'export const a = 2;\n',
+          'packages/x/tests/unit/url-special-capture.test.ts': testImporting(
+            `@fixture/x/dist/${capture}/a`,
+          ),
+        },
+      });
+    },
+  );
+
   it.each(['%2e', '%2e%2e', '%6eode_modules', '%61', '%2f'])(
     'refuses an encoded wildcard capture %s despite a changed literal file',
     (segment) => {

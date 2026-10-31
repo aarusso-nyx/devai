@@ -215,6 +215,18 @@ describe('IA-001: an Engineer test adjacent to the task change is admitted', () 
     expect(verdict.outOfScope).toEqual(['packages/x/tests/unit/b-wildcard.test.ts']);
   });
 
+  it.each(['cost?query', 'cost#fragment', 'cost\\path'])(
+    'refuses a URL-special wildcard capture %s despite a changed literal file',
+    async (capture) => {
+      const test = 'packages/x/tests/unit/url-special-capture.test.ts';
+      const verdict = await judge({
+        [`packages/x/src/${capture}/a.ts`]: 'export const a = 2;\n',
+        [test]: regression(`@fixture/x/dist/${capture}/a`),
+      });
+      expect(verdict.outOfScope).toEqual([test]);
+    },
+  );
+
   it.each(['%2e', '%2e%2e', '%6eode_modules', '%61', '%2f'])(
     'refuses an encoded wildcard capture %s despite a changed literal file',
     async (segment) => {
