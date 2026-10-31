@@ -57,9 +57,11 @@ function dirtyPaths(root: string): string[] {
     .split('\0')
     .filter(Boolean);
   // An untracked nested repository is listed as a directory with a trailing slash.
+  // Apply runtime exclusions before normalizing that directory marker.
   return entries
-    .map((entry) => entry.slice(3).replace(/\/$/u, ''))
-    .filter((path) => !runtimePath(path));
+    .map((entry) => entry.slice(3))
+    .filter((path) => !runtimePath(path))
+    .map((path) => path.replace(/\/$/u, ''));
 }
 
 /** A regular file's bytes, for assertion comparison; undefined for a link or an absent path. */
