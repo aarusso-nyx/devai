@@ -468,9 +468,9 @@ function subpathEntry(exported, subpath) {
   }
   if (
     best === undefined ||
-    // URL-encoded captures are outside this static resolver's supported subset.
-    // Never treat an encoded URL as evidence for a literal percent-named file.
-    best.match.includes('%') ||
+    // Encoded and URL-special captures are outside this static resolver's subset.
+    // Never treat URL syntax as evidence for a different literal source filename.
+    /[%?#\\]/u.test(best.match) ||
     best.match.split(/[/\\]/u).some((segment) => INVALID_SEGMENTS.has(segment.toLowerCase()))
   ) {
     return { entry: undefined, match: undefined };
