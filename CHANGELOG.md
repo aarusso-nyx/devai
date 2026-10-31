@@ -51,7 +51,8 @@ package and provenance; this candidate does not rotate that trust pin.
 - Preserve existing test statements when admitting Engineer regression additions;
   refuse inserted guards, returns, hooks, mocks, side-effect imports and focused
   registrations that suppress existing tests. Track
-  submodule gitlinks, refuse divergent committed paths before file reads, and
+  submodule gitlinks while preserving runtime directory exclusions, refuse
+  divergent committed paths before file reads, and
   report missing focused tests as scope refusals.
 - Resolve supported workspace wildcard exports with exact-key precedence and
   deterministic specificity. Refuse unrelated imports and unsupported URL-encoded
