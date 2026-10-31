@@ -129,7 +129,9 @@ function exportTargets(manifest: Workspace['manifest'], subpath: string): readon
       return typeof target === 'string' ? [target] : [];
     });
   }
-  return match === undefined ? targets : targets.map((target) => target.replaceAll('*', match));
+  return match === undefined
+    ? targets
+    : targets.map((target) => target.replaceAll('*', () => match));
 }
 
 /**
