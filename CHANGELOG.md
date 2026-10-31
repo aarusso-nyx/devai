@@ -56,7 +56,7 @@ package and provenance; this candidate does not rotate that trust pin.
   report missing focused tests as scope refusals.
 - Resolve supported workspace wildcard exports with exact-key precedence and
   deterministic specificity and literal capture substitution. Refuse unrelated
-  imports and unsupported URL-encoded
+  imports and unsupported encoded or URL-special
   wildcard captures; use the pinned constitution before framework law.
 - Qualify the native protected namespace using its actual APFS filesystem name,
   preserving Darwin-only admission, supported Node/libuv, every native assertion,
